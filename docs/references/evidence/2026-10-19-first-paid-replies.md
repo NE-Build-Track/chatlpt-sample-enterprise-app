@@ -1,6 +1,6 @@
 # Runtime evidence: the payment stack and the first paid replies, 19 October 2026
 
-Plan [02](../../exec-plans/active/plan-02-payments-stack.md). Everything ran from `deploy/compose.yaml`
+Plan [02](../../exec-plans/completed/plan-02-payments-stack.md). Everything ran from `deploy/compose.yaml`
 on the developer's machine: Clearinghouse Batteries `ca09e47`, node signer `406b248` (v1.0.2), and
 ChatLPT at commit `3d3a484` plus the fixes recorded below, embedding livepeer-builder `v0.1.0`.
 

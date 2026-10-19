@@ -39,7 +39,7 @@ of that. Budget for this plan: under $0.05.
 - 2026-10-19: stack up, allocation created, four paid jobs (one probe, three replies, one of them by a second
   account through the browser), both books filled, attribution matched; spend $0.0005. Two defects found and
   fixed: the engine's `none` cost status was recorded as final, and the chat page lacked a `TooltipProvider`.
-  Evidence: [2026-10-19-first-paid-replies](../../references/evidence/2026-10-19-first-paid-replies.md).
+  Evidence: [2026-10-19-first-paid-replies](../../references/evidence/2026-10-19-first-paid-replies.md). Plan complete.
 
 ## Decision log
 
