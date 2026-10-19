@@ -91,3 +91,19 @@ async def test_empty_host_list_means_any_host_and_bad_metadata_is_ignored() -> N
     assert discovery.model_from_discovery(APP) is None
     entries.append(entry("https://two.example", runner(APP, metadata=None)))
     assert len(await discovery.fetch()) == 3
+
+
+async def test_the_smallest_advertised_window_wins_across_approved_runners() -> None:
+    entries = [
+        entry("https://orch-us-central.xodeapp.xyz:18935", runner(APP)),
+        entry("https://us-central-metrics.speedybird.xyz:28935", runner(APP, metadata=SMALLER)),
+        entry(
+            "https://evil.example:8935", runner(APP, metadata=json.dumps({"max_context": 8}))
+        ),  # dropped host
+    ]
+    discovery, _ = source(
+        entries, frozenset({"orch-us-central.xodeapp.xyz", "us-central-metrics.speedybird.xyz"})
+    )
+    assert len(await discovery.fetch()) == 2
+    model = discovery.model_from_discovery(APP)
+    assert model is not None and model.max_model_len == 40960  # the engine may route to either runner

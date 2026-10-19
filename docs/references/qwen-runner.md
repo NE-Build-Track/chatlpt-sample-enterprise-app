@@ -22,7 +22,8 @@ studio's `runner-schemas/blueclaw_chat_qwen3.8-27b.openapi.json`). Re-verify on 
 - Observed on speedybird and xode. open-pool and hky were discovered but not routed to.
 - **Discovery metadata (2026-10-19):** the runner's entry carries
   `{"blueclaw":1,"capability":"openai:chat-completions","unit":"tokens","model_id":"Qwen3.8-27B","name":"Qwen 3.8 27B","category":"chat","max_context":131072}`,
-  which matches vLLM's `max_model_len` of 131072. ChatLPT reads it instead of paying for `GET /v1/models` (D14).
+  which matches vLLM's `max_model_len` of 131072 on xode and hky; **speedybird advertises `max_context` 40960**
+  for the same app. ChatLPT takes the smallest across the approved runners instead of paying for `GET /v1/models` (D14).
 - **Reasoning:** with `chat_template_kwargs.enable_thinking: true` the reply carries `message.reasoning`, but
   `usage.completion_tokens_details` was absent, so reasoning tokens are counted inside `completion_tokens`.
 - **Cost arrives in rounds.** A 5.7 s reply produced two usage rows ($0.000111 + $0.000056); the engine's cost
