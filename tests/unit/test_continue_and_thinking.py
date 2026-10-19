@@ -8,7 +8,7 @@ import pytest
 from chatlpt.contracts import ChatTurn, Message, NewMessage, NewUser, ReplyChunk, TokenUsage
 from chatlpt.errors import InvalidRequest, NotFound
 from chatlpt.runtime import Application
-from chatlpt.services.chat import chain_text, turns_from
+from chatlpt.services.history import chain_text, turns_from
 from chatlpt.testing import MemoryStore, ScriptedBackend
 from tests.unit.test_chat import collect
 

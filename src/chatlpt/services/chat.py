@@ -12,7 +12,7 @@ two assistant messages, one of them a ``tool_call`` message carrying the image.
 import asyncio
 import json
 import logging
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator
 from datetime import datetime, timedelta
 from uuid import UUID
 
@@ -37,59 +37,15 @@ from chatlpt.protocols import ChatBackend, Clock, ConversationStore, UsageLedger
 from chatlpt.services.billing import BillingService
 from chatlpt.services.context import TURN_OVERHEAD_TOKENS, ContextService
 from chatlpt.services.conversations import NEW_TITLE, ConversationService, title_from
-from chatlpt.services.images import SIZES, ImageService
+from chatlpt.services.history import GENERATE_IMAGE, chain_text, turns_from
+from chatlpt.services.images import ImageService
+from chatlpt.services.wholesale import WholesaleSync
 from chatlpt.utils import estimate_tokens, new_id
 
 _LOG = logging.getLogger(__name__)
 ReplyQueue = asyncio.Queue[ReplyEvent | None]
 MIN_OUTPUT_TOKENS = 256
-GENERATE_IMAGE = ToolSpec(
-    name="generate_image",
-    description=(
-        "Generate an image from a text prompt. Call this whenever the user asks you to draw, paint, render, "
-        "illustrate, sketch or create a picture or photo. Write a vivid, specific prompt."
-    ),
-    parameters={
-        "type": "object",
-        "properties": {
-            "prompt": {"type": "string", "description": "A detailed description of the image to generate"},
-            "image_size": {"type": "string", "enum": sorted(SIZES), "description": "Aspect ratio and size"},
-        },
-        "required": ["prompt"],
-    },
-)
 ThinkingBudgets = dict[ThinkingLevel, int]
-
-
-def turns_from(messages: Sequence[Message]) -> list[ChatTurn]:
-    """History as the model should see it: continuation segments fold into the message they extend."""
-    turns: list[ChatTurn] = []
-    for message in messages:
-        if message.role in ("system", "tool"):
-            continue
-        content = message.content
-        if message.kind == "tool_call":
-            prompts = [i.prompt for i in message.images] or [
-                str(c.arguments.get("prompt", "")) for c in message.tool_calls
-            ]
-            content = "\n".join(f"[Generated an image from the prompt: {p}]" for p in prompts if p)
-        if not content:
-            continue
-        if message.role == "assistant" and turns and turns[-1].role == "assistant":
-            glue = "" if message.continues_message_id is not None else "\n"
-            turns[-1] = ChatTurn(role="assistant", content=turns[-1].content + glue + content)
-            continue
-        turns.append(ChatTurn(role=message.role, content=content))
-    return turns
-
-
-def chain_text(messages: Sequence[Message], message_id: UUID) -> str:
-    """The text of an assistant message plus every continuation that already extends it."""
-    text = ""
-    for message in messages:
-        if message.id == message_id or message.continues_message_id == message_id:
-            text += message.content
-    return text
 
 
 class ChatService:
@@ -120,7 +76,7 @@ class ChatService:
         self._params = params
         self._budgets = thinking_budgets
         self._history_limit = history_turn_limit
-        self._settle_window = wholesale_settle_window
+        self._wholesale = WholesaleSync(ledger, backend, clock, settle_window=wholesale_settle_window)
         self._tasks: set[asyncio.Task[None]] = set()
 
     # -- entry points -------------------------------------------------------------------------------
@@ -467,38 +423,8 @@ class ChatService:
         return final
 
     async def sync_wholesale(self) -> int:
-        """Ask the engine for every pending wholesale cost and fill the ones that arrived.
-
-        Returns the number filled.
-        """
-        if self._backend is None:
-            return 0
-        filled = 0
-        since = self._clock.now() - self._settle_window
-        for record in await self._ledger.pending_wholesale(settling_since=since):
-            if record.job_id is None:
-                continue
-            try:
-                cost = await self._backend.wholesale(record.user_id, record.job_id)
-            except AppError as error:
-                _LOG.warning(
-                    "wholesale lookup failed",
-                    extra={"event": "billing.wholesale_failed", "error": str(error)},
-                )
-                continue
-            if cost.status in ("pending", "none"):
-                continue  # "none" is the engine's "not yet known" for a paid job; never a zero
-            if cost.status == record.wholesale.status and cost.amount == record.wholesale.amount:
-                continue  # settled and unchanged
-            filled_cost = cost.model_copy(
-                update={
-                    "updated_at": self._clock.now(),
-                    "orchestrator_url": record.wholesale.orchestrator_url,
-                }
-            )
-            await self._ledger.update_wholesale(record.message_id, filled_cost)
-            filled += 1
-        return filled
+        """Fill wholesale costs that arrived (docs: services/wholesale.py). Returns the number filled."""
+        return await self._wholesale.sync_once()
 
     async def drain(self) -> None:
         """Wait for in-flight replies (shutdown)."""

@@ -10,7 +10,7 @@ import pytest
 from chatlpt.contracts import NewMessage, NewUser, ReplyChunk, TokenUsage, ToolCall
 from chatlpt.errors import NotFound, ReplyFailed
 from chatlpt.runtime import Application
-from chatlpt.services.chat import GENERATE_IMAGE, turns_from
+from chatlpt.services.history import GENERATE_IMAGE, turns_from
 from chatlpt.services.images import megapixels_billed
 from chatlpt.testing import MemoryImageFiles, MemoryStore, ScriptedBackend, ScriptedImageBackend
 from tests.unit.test_chat import collect
