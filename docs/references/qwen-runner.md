@@ -1,0 +1,22 @@
+# The `blueclaw/chat/qwen3.8-27b` runner
+
+Observed through the engine on 2026-10-14, 2026-10-17 and 2026-10-19 (builder-core evidence and the
+studio's `runner-schemas/blueclaw_chat_qwen3.8-27b.openapi.json`). Re-verify on first paid call.
+
+- A **vLLM** OpenAI-compatible server. Paths: `/v1/chat/completions`, `/v1/completions`,
+  `/v1/responses`, `/v1/messages`, `/v1/models`, `/tokenize`, `/detokenize`, `/health`.
+- `GET /v1/models` lists one model, `Qwen3.8-27B`, with `max_model_len` (vLLM's model card). This is
+  the context window (D14).
+- `ChatCompletionRequest` supports `stream`, `stream_options` (`include_usage`), `include_reasoning`,
+  `reasoning_effort`, `thinking_token_budget`, `max_tokens`, `temperature`, `top_p`, `tools`.
+  The `model` field may be omitted; the runner serves one model.
+- Non-streaming reply: standard chat completion body, `choices[0].message.content`,
+  `choices[0].message.reasoning` (null or empty so far), `usage.{prompt,completion,total}_tokens`.
+  Reasoning tokens, when present, are inside `completion_tokens`; vLLM may also report
+  `usage.completion_tokens_details.reasoning_tokens`. Record both when present.
+- Streaming reply (`stream: true`): `text/event-stream`, `data: {...}` chunks with
+  `choices[0].delta.content` and `choices[0].delta.reasoning`, then a final chunk with `usage` when
+  `stream_options.include_usage` is true, then `data: [DONE]`.
+- **Billed per second** of the call ($0.0000111/s observed), not per token. Short replies took
+  2.4–2.9 s end to end; cost about $0.00003 each.
+- Observed on speedybird and xode. open-pool and hky were discovered but not routed to.
