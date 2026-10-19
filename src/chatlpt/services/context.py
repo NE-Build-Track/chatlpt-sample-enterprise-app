@@ -75,7 +75,9 @@ class ContextService:
         return await self._cache.get_model_info(app)
 
     @staticmethod
-    def fit(system_prompt: str, history: Sequence[ChatTurn], *, window: int, reserve: int) -> list[ChatTurn]:
+    def fit(
+        system_prompt: str, history: Sequence[ChatTurn], *, window: int, reserve: int
+    ) -> tuple[list[ChatTurn], int]:
         """Keep the system prompt and the newest turns that fit ``window - reserve``.
 
         The last turn always stays, even when it alone exceeds the budget.
@@ -89,4 +91,4 @@ class ContextService:
             kept.append(turn)
             budget -= cost
         kept.reverse()
-        return [ChatTurn(role="system", content=system_prompt), *kept]
+        return [ChatTurn(role="system", content=system_prompt), *kept], len(history) - len(kept)

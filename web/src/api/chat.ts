@@ -3,12 +3,21 @@ import { ReplyEvent } from "./schemas";
 
 /** POST a message and yield the server-sent reply events. Aborting the signal stops reading; the server
  *  keeps producing the paid reply and saves it. */
-export async function* sendMessage(conversationId: string, content: string, signal: AbortSignal): AsyncGenerator<ReplyEvent> {
-  const response = await fetch(`/api/conversations/${conversationId}/messages`, {
+export function sendMessage(conversationId: string, content: string, signal: AbortSignal): AsyncGenerator<ReplyEvent> {
+  return readEvents(`/api/conversations/${conversationId}/messages`, JSON.stringify({ content }), signal);
+}
+
+/** Continue a reply the runner cut off at the output limit; the events describe a new segment. */
+export function continueMessage(conversationId: string, messageId: string, signal: AbortSignal): AsyncGenerator<ReplyEvent> {
+  return readEvents(`/api/conversations/${conversationId}/messages/${messageId}/continue`, undefined, signal);
+}
+
+async function* readEvents(url: string, body: string | undefined, signal: AbortSignal): AsyncGenerator<ReplyEvent> {
+  const response = await fetch(url, {
     method: "POST",
     credentials: "same-origin",
     headers: { "content-type": "application/json", accept: "text/event-stream", ...csrfHeaders },
-    body: JSON.stringify({ content }),
+    body,
     signal,
   });
   if (!response.ok || !response.body) throw await toError(response);

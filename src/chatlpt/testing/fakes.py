@@ -16,6 +16,7 @@ from chatlpt.contracts import (
     OAuthProviderName,
     PriceTable,
     ReplyChunk,
+    ThinkingLevel,
     TokenUsage,
     UsageRecord,
     UsageTotals,
@@ -204,6 +205,10 @@ class MemoryStore:
     async def touch_conversation(self, conversation_id: UUID, updated_at: datetime) -> None:
         c = self.conversations[conversation_id]
         self.conversations[conversation_id] = c.model_copy(update={"updated_at": updated_at})
+
+    async def set_thinking(self, conversation_id: UUID, thinking: ThinkingLevel) -> None:
+        c = self.conversations[conversation_id]
+        self.conversations[conversation_id] = c.model_copy(update={"thinking": thinking})
 
     async def delete_conversation(self, conversation_id: UUID) -> None:
         self.conversations.pop(conversation_id, None)

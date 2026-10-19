@@ -12,12 +12,14 @@ from chatlpt.contracts.common import Contract, Money
 
 Role = Literal["system", "user", "assistant"]
 ReplyState = Literal["streaming", "complete", "failed", "uncertain"]
+ThinkingLevel = Literal["off", "low", "medium", "high"]  # per conversation (D24)
 
 
 class Conversation(Contract):
     id: UUID
     user_id: UUID
     title: str
+    thinking: ThinkingLevel = "medium"
     created_at: datetime
     updated_at: datetime
 
@@ -35,6 +37,8 @@ class Message(Contract):
     retail: Money | None = None
     wholesale: WholesaleCost | None = None
     finish_reason: str | None = None  # the runner's own: "stop", "length" (cut off at the output limit), ...
+    continues_message_id: UUID | None = None  # a "continue generating" segment of that assistant message
+    dropped_turns: int | None = None  # earlier turns left out to fit the model's context window
     error: str | None = None
     created_at: datetime
 
@@ -54,6 +58,8 @@ class ChatParams(Contract):
     max_output_tokens: int = Field(ge=1)
     include_reasoning: bool = True
     thinking_token_budget: int | None = Field(default=None, ge=1)
+    reasoning_effort: Literal["low", "medium", "high"] | None = None
+    continue_final_message: bool = False  # the last turn is a partial assistant answer to continue (D24)
     timeout_s: float = Field(default=300.0, gt=0, le=3600)
 
 
@@ -82,8 +88,11 @@ class NewMessage(Contract):
     content: str = Field(min_length=1, max_length=32_000)
 
 
-class RenameConversation(Contract):
-    title: str = Field(min_length=1, max_length=200)
+class UpdateConversation(Contract):
+    """PATCH body: either field may be omitted."""
+
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    thinking: ThinkingLevel | None = None
 
 
 ReplyEventType = Literal["start", "reasoning", "content", "usage", "done", "error"]
@@ -94,6 +103,7 @@ class ReplyEvent(Contract):
 
     type: ReplyEventType
     user_message: Message | None = None  # on start
+    dropped_turns: int = 0  # on start: earlier turns left out to fit the context window
     message: Message | None = None  # on start (the streaming placeholder) and done (final)
     text: str = ""  # on reasoning / content
     error: str | None = None  # on error

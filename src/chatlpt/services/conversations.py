@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from chatlpt.contracts import Conversation, Message, User
+from chatlpt.contracts import Conversation, Message, ThinkingLevel, User
 from chatlpt.errors import NotFound
 from chatlpt.protocols import Clock, ConversationStore
 from chatlpt.utils import new_id
@@ -18,14 +18,22 @@ def title_from(text: str) -> str:
 
 
 class ConversationService:
-    def __init__(self, store: ConversationStore, clock: Clock) -> None:
+    def __init__(
+        self, store: ConversationStore, clock: Clock, *, default_thinking: ThinkingLevel = "medium"
+    ) -> None:
         self._store = store
         self._clock = clock
+        self._default_thinking = default_thinking
 
     async def create(self, user: User) -> Conversation:
         now = self._clock.now()
         conversation = Conversation(
-            id=new_id(), user_id=user.id, title=NEW_TITLE, created_at=now, updated_at=now
+            id=new_id(),
+            user_id=user.id,
+            title=NEW_TITLE,
+            thinking=self._default_thinking,
+            created_at=now,
+            updated_at=now,
         )
         await self._store.create_conversation(conversation)
         return conversation
@@ -44,6 +52,11 @@ class ConversationService:
         now = self._clock.now()
         await self._store.rename_conversation(conversation.id, title, now)
         return conversation.model_copy(update={"title": title, "updated_at": now})
+
+    async def set_thinking(self, user: User, conversation_id: UUID, thinking: ThinkingLevel) -> Conversation:
+        conversation = await self.get(user, conversation_id)
+        await self._store.set_thinking(conversation.id, thinking)
+        return conversation.model_copy(update={"thinking": thinking})
 
     async def delete(self, user: User, conversation_id: UUID) -> None:
         conversation = await self.get(user, conversation_id)

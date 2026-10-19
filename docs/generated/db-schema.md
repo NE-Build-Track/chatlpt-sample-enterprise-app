@@ -58,6 +58,7 @@ erDiagram
 | `id` | VARCHAR(36) | no | primary key |
 | `user_id` | VARCHAR(36) | no | → users.id |
 | `title` | VARCHAR(200) | no |  |
+| `thinking` | VARCHAR(8) | no |  |
 | `created_at` | DATETIME | no |  |
 | `updated_at` | DATETIME | no |  |
 
@@ -92,5 +93,7 @@ erDiagram
 | `wholesale_usd` | VARCHAR(64) | yes |  |
 | `wholesale_updated_at` | DATETIME | yes |  |
 | `finish_reason` | VARCHAR(32) | yes |  |
+| `continues_message_id` | VARCHAR(36) | yes |  |
+| `dropped_turns` | INTEGER | yes |  |
 | `error` | TEXT | yes |  |
 | `created_at` | DATETIME | no |  |

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { sendMessage } from "@/api/chat";
+import { continueMessage, sendMessage } from "@/api/chat";
 import { conversationKeys, useConversation, useModel } from "@/api/conversations";
 import type { Message } from "@/api/schemas";
 import { HttpError } from "@/api/client";
@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Composer } from "./Composer";
 import { MessageItem } from "./MessageItem";
 import { formatMoney } from "@/features/usage/format";
+import { ThinkingSelect } from "./ThinkingSelect";
 
 type Live = { message: Message; content: string; reasoning: string };
 
@@ -25,21 +26,13 @@ export function ChatPage() {
   const bottom = useRef<HTMLDivElement>(null);
   const started = useRef(false);
 
-  const send = useCallback(
-    async (text: string) => {
+  const run = useCallback(
+    async (events: (signal: AbortSignal) => AsyncGenerator<import("@/api/schemas").ReplyEvent>) => {
       setError(null);
       const controller = new AbortController();
       abort.current = controller;
-      setPendingUser({
-        id: "pending-user",
-        conversation_id: conversationId,
-        role: "user",
-        content: text,
-        state: "complete",
-        created_at: new Date().toISOString(),
-      });
       try {
-        for await (const event of sendMessage(conversationId, text, controller.signal)) {
+        for await (const event of events(controller.signal)) {
           if (event.type === "start" && event.message) {
             setPendingUser(event.user_message ?? null);
             setLive({ message: event.message, content: "", reasoning: "" });
@@ -67,6 +60,26 @@ export function ChatPage() {
     [client, conversationId],
   );
 
+  const send = useCallback(
+    (text: string) => {
+      setPendingUser({
+        id: "pending-user",
+        conversation_id: conversationId,
+        role: "user",
+        content: text,
+        state: "complete",
+        created_at: new Date().toISOString(),
+      });
+      return run((signal) => sendMessage(conversationId, text, signal));
+    },
+    [conversationId, run],
+  );
+
+  const continueFrom = useCallback(
+    (message: Message) => run((signal) => continueMessage(conversationId, message.id, signal)),
+    [conversationId, run],
+  );
+
   useEffect(() => {
     const initial = (location.state as { initialMessage?: string } | null)?.initialMessage;
     if (initial && !started.current && conversation.data) {
@@ -82,14 +95,28 @@ export function ChatPage() {
 
   const messages = conversation.data?.messages ?? [];
   const totals = conversation.data?.totals;
+  const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+  const busy = Boolean(live) || Boolean(pendingUser);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {conversation.data && (
+        <div className="flex justify-end px-4">
+          <ThinkingSelect conversationId={conversationId} value={conversation.data.conversation.thinking} />
+        </div>
+      )}
       <div className="min-h-0 flex-1 overflow-y-auto px-4">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 py-6">
           {messages
             .filter((m) => !(live && m.id === live.message.id))
-            .map((m) => <MessageItem key={m.id} message={m} />)}
+            .map((m) => (
+              <MessageItem
+                key={m.id}
+                message={m}
+                canContinue={!busy && lastAssistant?.id === m.id}
+                onContinue={continueFrom}
+              />
+            ))}
           {pendingUser && !messages.some((m) => m.id === pendingUser.id) && <MessageItem message={pendingUser} />}
           {live && (
             <MessageItem
@@ -114,7 +141,7 @@ export function ChatPage() {
       <Composer
         onSend={send}
         onStop={() => abort.current?.abort()}
-        streaming={Boolean(live) || Boolean(pendingUser)}
+        streaming={busy}
         disabled={model.data?.chat_available === false}
       />
     </div>

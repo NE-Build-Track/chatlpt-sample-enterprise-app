@@ -17,6 +17,7 @@ from chatlpt.contracts import (
     Money,
     OAuthIdentity,
     OAuthProviderName,
+    ThinkingLevel,
     UsageRecord,
     UsageTotals,
     User,
@@ -173,6 +174,9 @@ class SqlStore:
 
     async def touch_conversation(self, conversation_id: UUID, updated_at: datetime) -> None:
         await self._set_conversation(conversation_id, updated_at=updated_at)
+
+    async def set_thinking(self, conversation_id: UUID, thinking: ThinkingLevel) -> None:
+        await self._set_conversation(conversation_id, thinking=thinking)
 
     async def _set_conversation(self, conversation_id: UUID, **values: Any) -> None:
         async with self.engine.begin() as conn:

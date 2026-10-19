@@ -41,3 +41,20 @@ once; with streaming the first token is on screen at 1.4 s and the answer builds
 - A client disconnect mid-reply on the real network (the service keeps reading by design; unit-tested).
 - The engine's own live streaming evidence is in builder-core:
   `docs/references/evidence/2026-10-19-streaming-live.md` on the branch.
+
+## Addendum, later the same day: continue generating and thinking levels (D24)
+
+To prove vLLM's `continue_final_message` on this runner, the output cap was set to 300 tokens for
+one deployment, thinking switched off on a fresh conversation through `PATCH /api/conversations/{id}`,
+and a 500-word essay requested.
+
+| Step | Result |
+| --- | --- |
+| First reply | `finish_reason: length`, 68 prompt / 300 completion tokens, ends mid-sentence: "…dam construction, and climate change, which alter" |
+| `POST …/messages/{id}/continue` | a new segment with `continues_message_id` set; 368 prompt tokens (history plus the partial answer), 149 completion tokens, 93 content deltas, `finish_reason: stop` |
+| The continuation's first words | " flow regimes and water quality. Protecting river ecosystems is vital…": the sentence completes where the first segment stopped |
+| Conversation totals | 2 replies, 449 completion tokens; each segment is its own paid job and ledger row |
+
+The cap went back to 32,768 afterwards. Spend for the two segments: about $0.0002.
+
+![Continued reply](2026-10-19-continue.png)

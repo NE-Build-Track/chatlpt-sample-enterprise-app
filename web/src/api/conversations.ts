@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { request } from "./client";
-import { Conversation, ConversationOut, ModelOut, UsageTotals } from "./schemas";
+import { Conversation, ConversationOut, ModelOut, type ThinkingLevel, UsageTotals } from "./schemas";
 
 export const conversationKeys = {
   all: ["conversations"] as const,
@@ -38,6 +38,18 @@ export function useRenameConversation() {
     mutationFn: ({ id, title }: { id: string; title: string }) =>
       request(Conversation, `/api/conversations/${id}`, { method: "PATCH", body: JSON.stringify({ title }) }),
     onSuccess: () => client.invalidateQueries({ queryKey: conversationKeys.all }),
+  });
+}
+
+export function useSetThinking() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, thinking }: { id: string; thinking: ThinkingLevel }) =>
+      request(Conversation, `/api/conversations/${id}`, { method: "PATCH", body: JSON.stringify({ thinking }) }),
+    onSuccess: (_data, { id }) => {
+      void client.invalidateQueries({ queryKey: conversationKeys.one(id) });
+      void client.invalidateQueries({ queryKey: conversationKeys.all });
+    },
   });
 }
 

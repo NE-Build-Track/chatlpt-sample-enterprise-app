@@ -24,6 +24,9 @@ studio's `runner-schemas/blueclaw_chat_qwen3.8-27b.openapi.json`). Re-verify on 
   `{"blueclaw":1,"capability":"openai:chat-completions","unit":"tokens","model_id":"Qwen3.8-27B","name":"Qwen 3.8 27B","category":"chat","max_context":131072}`,
   which matches vLLM's `max_model_len` of 131072 on xode and hky; **speedybird advertises `max_context` 40960**
   for the same app. ChatLPT takes the smallest across the approved runners instead of paying for `GET /v1/models` (D14).
+- **Continuation:** `continue_final_message: true` with `add_generation_prompt: false` makes vLLM continue the
+  trailing assistant turn; ChatLPT uses it for "Continue generating" (D24). `reasoning_effort` and
+  `thinking_token_budget` are accepted for the thinking level.
 - **Reasoning:** with `chat_template_kwargs.enable_thinking: true` the reply carries `message.reasoning`, but
   `usage.completion_tokens_details` was absent, so reasoning tokens are counted inside `completion_tokens`.
 - **Cost arrives in rounds.** A 5.7 s reply produced two usage rows ($0.000111 + $0.000056); the engine's cost

@@ -112,6 +112,12 @@ class BufferedEngineChat:
             payload["stream_options"] = {"include_usage": True}
         if params.include_reasoning and params.thinking_token_budget is not None:
             payload["thinking_token_budget"] = params.thinking_token_budget
+        if params.include_reasoning and params.reasoning_effort is not None:
+            payload["reasoning_effort"] = params.reasoning_effort
+        if params.continue_final_message:
+            # vLLM continues the trailing assistant turn instead of starting a new one ("continue generating")
+            payload["continue_final_message"] = True
+            payload["add_generation_prompt"] = False
         return JobRequest(
             app=self.app,
             path=CHAT_PATH,

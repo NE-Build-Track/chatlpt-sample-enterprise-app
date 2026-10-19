@@ -6,6 +6,7 @@ The embedded engine reads its own ``LPB_*`` variables; this module does not dupl
 import os
 from collections.abc import Mapping
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import Field, SecretStr
 
@@ -50,9 +51,11 @@ class Settings(Contract):
     )
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
     temperature: Decimal = Field(default=Decimal("0.7"), ge=0, le=2)
-    max_output_tokens: int = Field(default=16_384, ge=1)  # answer + thinking; the network bills per second
-    include_reasoning: bool = True
-    thinking_token_budget: int | None = Field(default=4096, ge=1)  # caps the chain of thought (vLLM/Qwen)
+    max_output_tokens: int = Field(default=32_768, ge=1)  # answer + thinking; the network bills per second
+    default_thinking: Literal["off", "low", "medium", "high"] = "medium"  # per conversation (D24)
+    thinking_budget_low: int = Field(default=1024, ge=1)  # chain-of-thought caps per level (vLLM/Qwen)
+    thinking_budget_medium: int = Field(default=4096, ge=1)
+    thinking_budget_high: int = Field(default=16_384, ge=1)
     reply_timeout_s: float = Field(default=300.0, gt=0, le=3600)
     reply_idle_timeout_s: float = Field(
         default=60.0, gt=0, le=3600

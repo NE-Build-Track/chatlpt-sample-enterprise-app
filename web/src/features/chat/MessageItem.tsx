@@ -9,7 +9,17 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { describeWholesale, formatMoney, formatTokens } from "@/features/usage/format";
 import { cn } from "@/lib/utils";
 
-export function MessageItem({ message, streaming = false }: { message: Message; streaming?: boolean }) {
+export function MessageItem({
+  message,
+  streaming = false,
+  onContinue,
+  canContinue = false,
+}: {
+  message: Message;
+  streaming?: boolean;
+  onContinue?: (message: Message) => void;
+  canContinue?: boolean;
+}) {
   if (message.role === "user") {
     return (
       <div className="flex justify-end">
@@ -17,8 +27,14 @@ export function MessageItem({ message, streaming = false }: { message: Message; 
       </div>
     );
   }
+  const continuation = Boolean(message.continues_message_id);
   return (
-    <div className="space-y-2">
+    <div className={cn("space-y-2", continuation && "-mt-4")}>
+      {message.dropped_turns ? (
+        <p className="text-xs text-muted-foreground">
+          {message.dropped_turns} earlier {message.dropped_turns === 1 ? "message was" : "messages were"} left out so this reply fits the model's context.
+        </p>
+      ) : null}
       {message.reasoning && <Thinking text={message.reasoning} streaming={streaming && !message.content} />}
       <div className={cn("prose prose-sm max-w-none dark:prose-invert prose-pre:bg-muted prose-pre:text-foreground", streaming && "animate-pulse-caret")}>
         {message.content ? (
@@ -36,13 +52,20 @@ export function MessageItem({ message, streaming = false }: { message: Message; 
         </p>
       )}
       {message.state === "complete" && message.finish_reason === "length" && (
-        <p className="text-sm text-muted-foreground">
-          {message.content
-            ? "This reply was cut off at the output limit."
-            : `The model used its whole output budget while thinking${
-                message.usage ? ` (${formatTokens(message.usage.completion_tokens)} tokens)` : ""
-              } and produced no answer. Try again, or ask for a shorter answer.`}
-        </p>
+        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          <span>
+            {message.content
+              ? "This reply was cut off at the output limit."
+              : `The model used its whole output budget while thinking${
+                  message.usage ? ` (${formatTokens(message.usage.completion_tokens)} tokens)` : ""
+                } and produced no answer. Try again, or ask for a shorter answer.`}
+          </span>
+          {canContinue && message.content && onContinue && (
+            <button onClick={() => onContinue(message)} className="rounded-md border px-2 py-1 text-xs hover:bg-accent">
+              Continue generating
+            </button>
+          )}
+        </div>
       )}
       {message.state === "complete" && <CostLine message={message} />}
     </div>

@@ -19,11 +19,12 @@ from chatlpt.contracts import (
     ModelInfo,
     NewMessage,
     PriceTable,
-    RenameConversation,
     ReplyEvent,
+    UpdateConversation,
     UsageTotals,
     User,
 )
+from chatlpt.errors import InvalidRequest
 from chatlpt.http.sessions import csrf_guard
 from chatlpt.runtime import Application
 
@@ -85,8 +86,15 @@ def chat_router(app: Application, current_user: Callable[[Request], Awaitable[Us
         )
 
     @router.patch("/conversations/{conversation_id}", response_model=Conversation)
-    async def rename(conversation_id: UUID, body: RenameConversation, user: Current) -> Conversation:
-        return await app.conversations.rename(user, conversation_id, body.title)
+    async def update(conversation_id: UUID, body: UpdateConversation, user: Current) -> Conversation:
+        if body.title is None and body.thinking is None:
+            raise InvalidRequest("nothing to update")
+        conversation = await app.conversations.get(user, conversation_id)
+        if body.title is not None:
+            conversation = await app.conversations.rename(user, conversation_id, body.title)
+        if body.thinking is not None:
+            conversation = await app.conversations.set_thinking(user, conversation_id, body.thinking)
+        return conversation
 
     @router.delete("/conversations/{conversation_id}", status_code=204)
     async def delete(conversation_id: UUID, user: Current) -> None:
@@ -96,6 +104,21 @@ def chat_router(app: Application, current_user: Callable[[Request], Awaitable[Us
     async def send(conversation_id: UUID, body: NewMessage, user: Current) -> StreamingResponse:
         await app.conversations.get(user, conversation_id)  # 404 before the stream starts
         queue = app.chat.start_reply(user, conversation_id, body)
+
+        async def events() -> AsyncIterator[bytes]:
+            while (event := await queue.get()) is not None:
+                yield sse(event)
+
+        return StreamingResponse(
+            events(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    @router.post("/conversations/{conversation_id}/messages/{message_id}/continue")
+    async def continue_reply(conversation_id: UUID, message_id: UUID, user: Current) -> StreamingResponse:
+        await app.conversations.get(user, conversation_id)  # 404 before the stream starts
+        queue = app.chat.start_continue(user, conversation_id, message_id)
 
         async def events() -> AsyncIterator[bytes]:
             while (event := await queue.get()) is not None:

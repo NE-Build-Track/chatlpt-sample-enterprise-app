@@ -55,7 +55,8 @@ and plans checked in as artifacts.
 
 - Sign up with email and password; sign in with Google or GitHub when configured.
 - Chat with `Qwen3.8-27B` (`blueclaw/chat/qwen3.8-27b`), served by vLLM on approved Livepeer
-  orchestrators. Markdown replies, code blocks, a collapsible **Thinking** block, a stop button.
+  orchestrators. Markdown replies, code blocks, a collapsible **Thinking** block, a stop button, a
+  per-conversation thinking level, and **Continue generating** when a reply hits the output limit.
 - Under each reply: prompt, completion and reasoning tokens; **retail** cost from Alibaba Cloud's
   Qwen list prices; **wholesale** cost from the engine once Batteries reports it.
 - Conversation sidebar, rename and delete, per-conversation and per-month totals.
@@ -180,7 +181,8 @@ Everything is an environment variable; `deploy/.env.example` lists each with its
 | `CHATLPT_SESSION_SECRET` | Signs session cookies |
 | `CHATLPT_ADMIN_EMAILS` | Comma-separated admins |
 | `CHATLPT_GOOGLE_CLIENT_ID/SECRET`, `CHATLPT_GITHUB_CLIENT_ID/SECRET` | Enable each sign-in button |
-| `CHATLPT_SYSTEM_PROMPT`, `CHATLPT_TEMPERATURE`, `CHATLPT_MAX_OUTPUT_TOKENS`, `CHATLPT_THINKING_TOKEN_BUDGET` | Model defaults; the output limit covers answer plus thinking |
+| `CHATLPT_SYSTEM_PROMPT`, `CHATLPT_TEMPERATURE`, `CHATLPT_MAX_OUTPUT_TOKENS` | Model defaults; the output limit covers answer plus thinking |
+| `CHATLPT_DEFAULT_THINKING`, `CHATLPT_THINKING_BUDGET_LOW/MEDIUM/HIGH` | The per-conversation thinking level and its chain-of-thought caps |
 | `CHATLPT_CONTEXT_WINDOW_OVERRIDE` | Last-resort override of the derived context window |
 | `CHATLPT_PRICING_FILE` | The retail price table (`config/pricing/qwen3.8-27b.json`) |
 | `LPB_*` | The embedded engine: signer, Batteries, shared key, database. See [payment-stack](docs/references/payment-stack.md) |

@@ -43,15 +43,21 @@ export const Message = z.object({
   retail: Money.nullable().optional(),
   wholesale: WholesaleCost.nullable().optional(),
   finish_reason: z.string().nullable().optional(),
+  continues_message_id: z.string().nullable().optional(),
+  dropped_turns: z.number().nullable().optional(),
   error: z.string().nullable().optional(),
   created_at: z.string(),
 });
 export type Message = z.infer<typeof Message>;
 
+export const ThinkingLevel = z.enum(["off", "low", "medium", "high"]);
+export type ThinkingLevel = z.infer<typeof ThinkingLevel>;
+
 export const Conversation = z.object({
   id: z.string(),
   user_id: z.string(),
   title: z.string(),
+  thinking: ThinkingLevel.default("medium"),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -102,6 +108,7 @@ export type Providers = z.infer<typeof Providers>;
 export const ReplyEvent = z.object({
   type: z.enum(["start", "reasoning", "content", "usage", "done", "error"]),
   user_message: Message.nullable().optional(),
+  dropped_turns: z.number().default(0),
   message: Message.nullable().optional(),
   text: z.string().default(""),
   error: z.string().nullable().optional(),

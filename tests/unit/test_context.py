@@ -35,8 +35,8 @@ async def test_override_and_last_resort_when_the_model_cannot_be_asked() -> None
 
 def test_fit_keeps_the_system_prompt_and_the_newest_turns() -> None:
     history = [ChatTurn(role="user" if i % 2 == 0 else "assistant", content="x" * 400) for i in range(10)]
-    fitted = ContextService.fit("be brief", history, window=1000, reserve=200)
-    assert fitted[0].role == "system"
+    fitted, dropped = ContextService.fit("be brief", history, window=1000, reserve=200)
+    assert fitted[0].role == "system" and dropped == 3
     assert [t.content for t in fitted[1:]] == [
         t.content for t in history[-7:]
     ]  # 100 tokens + 4 overhead each
@@ -44,8 +44,8 @@ def test_fit_keeps_the_system_prompt_and_the_newest_turns() -> None:
 
 def test_fit_always_keeps_the_last_turn_even_when_it_is_too_big() -> None:
     history = [ChatTurn(role="user", content="y" * 10_000)]
-    fitted = ContextService.fit("sys", history, window=100, reserve=50)
-    assert len(fitted) == 2 and fitted[1].content == history[0].content
+    fitted, dropped = ContextService.fit("sys", history, window=100, reserve=50)
+    assert len(fitted) == 2 and fitted[1].content == history[0].content and dropped == 0
 
 
 async def test_discovery_metadata_wins_and_costs_nothing() -> None:

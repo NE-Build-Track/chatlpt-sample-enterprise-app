@@ -107,3 +107,43 @@ async def test_admin_routes_require_an_admin(client: httpx.AsyncClient) -> None:
 async def test_providers_lists_nothing_when_unconfigured(client: httpx.AsyncClient) -> None:
     assert (await client.get("/api/auth/providers")).json() == {"providers": [], "allow_signup": True}
     assert (await client.get("/api/auth/oauth/google/start")).status_code == 404
+
+
+async def test_patch_thinking_and_continue_route(client: httpx.AsyncClient, backend: ScriptedBackend) -> None:
+    from chatlpt.contracts import ReplyChunk, TokenUsage
+
+    await signup(client, "alice@example.com")
+    conversation_id = (await client.post("/api/conversations")).json()["id"]
+    assert (await client.patch(f"/api/conversations/{conversation_id}", json={})).status_code == 400
+    updated = await client.patch(
+        f"/api/conversations/{conversation_id}", json={"thinking": "high", "title": "Deep"}
+    )
+    assert updated.json()["thinking"] == "high" and updated.json()["title"] == "Deep"
+    assert (
+        await client.patch(f"/api/conversations/{conversation_id}", json={"thinking": "huge"})
+    ).status_code == 422
+
+    backend.script = [
+        ReplyChunk(kind="content", text="half"),
+        ReplyChunk(kind="usage", usage=TokenUsage(prompt_tokens=1, completion_tokens=2)),
+        ReplyChunk(kind="done", finish_reason="length"),
+    ]
+    async with client.stream(
+        "POST", f"/api/conversations/{conversation_id}/messages", json={"content": "go"}
+    ) as stream:
+        frames = (await stream.aread()).decode().strip().split("\n\n")
+    first_id = json.loads(frames[-1].split("\ndata: ", 1)[1])["message"]["id"]
+    backend.script = [
+        ReplyChunk(kind="content", text=" and rest"),
+        ReplyChunk(kind="done", finish_reason="stop"),
+    ]
+    async with client.stream(
+        "POST", f"/api/conversations/{conversation_id}/messages/{first_id}/continue"
+    ) as stream:
+        assert stream.status_code == 200
+        frames = (await stream.aread()).decode().strip().split("\n\n")
+    events = [json.loads(f.split("\ndata: ", 1)[1]) for f in frames]
+    assert [e["type"] for e in events] == ["start", "content", "done"]
+    assert events[-1]["message"]["continues_message_id"] == first_id
+    detail = await client.get(f"/api/conversations/{conversation_id}")
+    assert [m["role"] for m in detail.json()["messages"]] == ["user", "assistant", "assistant"]

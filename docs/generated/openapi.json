@@ -99,6 +99,17 @@
             "title": "Id",
             "type": "string"
           },
+          "thinking": {
+            "default": "medium",
+            "enum": [
+              "off",
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Thinking",
+            "type": "string"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -203,6 +214,18 @@
             "title": "Content",
             "type": "string"
           },
+          "continues_message_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Continues Message Id"
+          },
           "conversation_id": {
             "format": "uuid",
             "title": "Conversation Id",
@@ -212,6 +235,17 @@
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "dropped_turns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dropped Turns"
           },
           "error": {
             "anyOf": [
@@ -573,22 +607,6 @@
         "title": "ProvidersOut",
         "type": "object"
       },
-      "RenameConversation": {
-        "additionalProperties": false,
-        "properties": {
-          "title": {
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Title",
-            "type": "string"
-          }
-        },
-        "required": [
-          "title"
-        ],
-        "title": "RenameConversation",
-        "type": "object"
-      },
       "TokenUsage": {
         "additionalProperties": false,
         "description": "Token counts as the runner reported them in its final chunk (D19).",
@@ -621,6 +639,44 @@
           "completion_tokens"
         ],
         "title": "TokenUsage",
+        "type": "object"
+      },
+      "UpdateConversation": {
+        "additionalProperties": false,
+        "description": "PATCH body: either field may be omitted.",
+        "properties": {
+          "thinking": {
+            "anyOf": [
+              {
+                "enum": [
+                  "off",
+                  "low",
+                  "medium",
+                  "high"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thinking"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "UpdateConversation",
         "type": "object"
       },
       "UsageTotals": {
@@ -1195,7 +1251,7 @@
         ]
       },
       "patch": {
-        "operationId": "rename_api_conversations__conversation_id__patch",
+        "operationId": "update_api_conversations__conversation_id__patch",
         "parameters": [
           {
             "in": "path",
@@ -1212,7 +1268,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RenameConversation"
+                "$ref": "#/components/schemas/UpdateConversation"
               }
             }
           },
@@ -1240,7 +1296,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Rename",
+        "summary": "Update",
         "tags": [
           "chat"
         ]
@@ -1292,6 +1348,57 @@
           }
         },
         "summary": "Send",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/conversations/{conversation_id}/messages/{message_id}/continue": {
+      "post": {
+        "operationId": "continue_reply_api_conversations__conversation_id__messages__message_id__continue_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Message Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Continue Reply",
         "tags": [
           "chat"
         ]

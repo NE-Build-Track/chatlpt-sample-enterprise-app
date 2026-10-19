@@ -34,8 +34,10 @@ coding agents.
 - Looks and behaves like ChatGPT: a conversation sidebar, a composer, Markdown replies with code
   blocks, a stop button, and a collapsible **Thinking** block when the model returns reasoning (D15).
 - One model: `blueclaw/chat/qwen3.8-27b`, served by vLLM on the approved orchestrators (D8).
-- Replies stream token by token (D1). Until the engine supports streaming, the reply appears when
-  the engine returns it; the UI code path is the same.
+- Replies stream token by token through the engine (D1).
+- A reply cut off at the output limit offers **Continue generating** (D24); the continuation is a new
+  segment that renders attached to the reply. Each conversation has a **thinking level**, off to high.
+  A reply says when earlier turns were left out to fit the model's context.
 - The conversation title is the first user message, trimmed. No extra paid call (D16).
 - History sent to the model is truncated to fit the runner's context window, derived from the
   model's own `max_model_len` (D14). The system prompt, temperature and output cap are settings.

@@ -43,6 +43,7 @@ def conversation_from(row: Mapping[Any, Any]) -> Conversation:
         id=UUID(row["id"]),
         user_id=UUID(row["user_id"]),
         title=row["title"],
+        thinking=row["thinking"] or "medium",
         created_at=utc(row["created_at"]),
         updated_at=utc(row["updated_at"]),
     )
@@ -86,6 +87,10 @@ def message_from(row: Mapping[Any, Any]) -> Message:
         retail=_money(row["retail_usd"]),
         wholesale=wholesale_from(row),
         finish_reason=row["finish_reason"],
+        continues_message_id=None
+        if row["continues_message_id"] is None
+        else UUID(row["continues_message_id"]),
+        dropped_turns=row["dropped_turns"],
         error=row["error"],
         created_at=utc(row["created_at"]),
     )
@@ -114,6 +119,10 @@ def message_values(message: Message) -> dict[str, Any]:
         else str(wholesale.amount.amount),
         "wholesale_updated_at": None if wholesale is None else wholesale.updated_at,
         "finish_reason": message.finish_reason,
+        "continues_message_id": None
+        if message.continues_message_id is None
+        else str(message.continues_message_id),
+        "dropped_turns": message.dropped_turns,
         "error": message.error,
         "created_at": message.created_at,
     }

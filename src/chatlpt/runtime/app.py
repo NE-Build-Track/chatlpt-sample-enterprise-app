@@ -65,14 +65,12 @@ class Application:
             system_prompt=settings.system_prompt,
             temperature=settings.temperature,
             max_output_tokens=settings.max_output_tokens,
-            include_reasoning=settings.include_reasoning,
-            thinking_token_budget=settings.thinking_token_budget if settings.include_reasoning else None,
             timeout_s=settings.reply_timeout_s,
         )
         self.auth = AuthService(
             store, hasher, clock, admin_emails=settings.admin_email_set, allow_signup=settings.allow_signup
         )
-        self.conversations = ConversationService(store, clock)
+        self.conversations = ConversationService(store, clock, default_thinking=settings.default_thinking)
         self.context = ContextService(
             backend,
             store,
@@ -91,6 +89,12 @@ class Application:
             self.billing,
             clock,
             params=params,
+            thinking_budgets={
+                "off": 0,
+                "low": settings.thinking_budget_low,
+                "medium": settings.thinking_budget_medium,
+                "high": settings.thinking_budget_high,
+            },
             history_turn_limit=settings.history_turn_limit,
             wholesale_settle_window=timedelta(minutes=settings.wholesale_settle_minutes),
         )

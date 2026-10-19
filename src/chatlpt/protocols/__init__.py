@@ -18,6 +18,7 @@ from chatlpt.contracts import (
     OAuthProviderName,
     PriceTable,
     ReplyChunk,
+    ThinkingLevel,
     TokenUsage,
     UsageRecord,
     UsageTotals,
@@ -86,6 +87,8 @@ class ConversationStore(Protocol):
     async def rename_conversation(self, conversation_id: UUID, title: str, updated_at: datetime) -> None: ...
 
     async def touch_conversation(self, conversation_id: UUID, updated_at: datetime) -> None: ...
+
+    async def set_thinking(self, conversation_id: UUID, thinking: ThinkingLevel) -> None: ...
 
     async def delete_conversation(self, conversation_id: UUID) -> None: ...  # messages go; usage stays
 
