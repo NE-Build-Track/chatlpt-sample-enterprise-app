@@ -63,7 +63,8 @@ Each third-party package is confined to one module (enforced by `tests/structure
 
 | Package | Only in |
 | --- | --- |
-| `livepeer_builder` | `adapters/engine.py`, `runtime/engine.py` |
+| `livepeer_builder` | `adapters/engine.py`, `adapters/discovery.py`, `runtime/engine.py` |
+| `livepeer_gateway` (discovery only) | `adapters/discovery.py` |
 | `authlib`, `httpx` | `adapters/oauth.py` |
 | `argon2` | `adapters/passwords.py` |
 | `sqlalchemy`, `alembic`, `aiosqlite` | `store/` |
@@ -88,8 +89,9 @@ Each third-party package is confined to one module (enforced by `tests/structure
   `DefaultPolicy` still applies.
 - Payment runs in `per_application` mode: one shared `lpg_` allocation key for the whole app.
   Jobs still record the actor, so wholesale cost is attributable per user.
-- The engine's discovery is wrapped so the app only sees runners advertising the chat app on the
-  approved orchestrators.
+- The engine's discovery source is ours: it reads the signer's entries, keeps runners advertising the
+  chat app on the approved orchestrators, hands the engine standard `Runner` contracts, and remembers the
+  runner's `metadata` (`model_id`, `max_context`) for the context window.
 - Today (`v0.1.0`) a reply is `jobs.run` in immediate mode: one buffered body. The streaming design
   replaces that with `jobs.stream`; only `adapters/engine.py` changes.
 

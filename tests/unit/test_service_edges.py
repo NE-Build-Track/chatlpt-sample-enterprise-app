@@ -106,7 +106,7 @@ async def test_sync_wholesale_skips_records_without_jobs_and_tolerates_lookup_er
 
     backend.wholesale = fail  # type: ignore[method-assign]
     assert await application.chat.sync_wholesale() == 0
-    assert len(await store.pending_wholesale()) == 2
+    assert [x.job_id for x in await store.pending_wholesale()] == [job_id]  # the job-less row is never polled
 
 
 async def test_admin_edges(application: Application) -> None:

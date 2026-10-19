@@ -44,9 +44,10 @@ def test_json_formatter_redacts_secret_looking_fields_and_keeps_events() -> None
     record.event = "auth.login"
     record.api_key = "lpg_secret"
     record.user_id = "u1"
+    record.prompt_tokens = 91
     entry = json.loads(JsonFormatter().format(record))
     assert entry["event"] == "auth.login" and entry["user_id"] == "u1" and entry["level"] == "info"
-    assert entry["api_key"] == "[redacted]"
+    assert entry["api_key"] == "[redacted]" and entry["prompt_tokens"] == 91
 
 
 def test_configure_logging_installs_one_handler() -> None:

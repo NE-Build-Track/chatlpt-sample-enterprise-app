@@ -13,7 +13,15 @@ from chatlpt.adapters.passwords import Argon2Hasher
 from chatlpt.adapters.pricing import FilePriceSource
 from chatlpt.config import Settings
 from chatlpt.contracts import AppHealth, ChatParams, Check, PriceTable
-from chatlpt.protocols import AppStore, ChatBackend, Clock, OAuthProvider, PasswordHasher, PriceSource
+from chatlpt.protocols import (
+    AppStore,
+    ChatBackend,
+    Clock,
+    ModelMetadataSource,
+    OAuthProvider,
+    PasswordHasher,
+    PriceSource,
+)
 from chatlpt.runtime.engine import build_engine
 from chatlpt.services.admin import AdminService
 from chatlpt.services.auth import AuthService
@@ -45,6 +53,7 @@ class Application:
         prices: PriceSource,
         oauth: dict[str, OAuthProvider],
         engine: object | None = None,
+        metadata: ModelMetadataSource | None = None,
     ) -> None:
         self.settings = settings
         self.store = store
@@ -69,6 +78,7 @@ class Application:
             clock,
             ttl=timedelta(hours=settings.model_info_ttl_hours),
             override=settings.context_window_override,
+            metadata=metadata,
         )
         self.billing = BillingService(prices)
         self.chat = ChatService(
@@ -84,6 +94,7 @@ class Application:
         )
         self.admin = AdminService(store, store)
         self._prices = prices
+        self._metadata = metadata
         self._tasks: list[asyncio.Task[None]] = []
         self._stop = asyncio.Event()
 
@@ -92,13 +103,16 @@ class Application:
         settings = settings or Settings.from_env()
         clock = SystemClock()
         store = await SqlStore.connect(settings.database_url, migrate=settings.auto_migrate)
-        engine = await build_engine(
-            app=settings.chat_app, approved_hosts=settings.approved_orchestrator_hosts
+        built = await build_engine(
+            app=settings.chat_app, approved_hosts=settings.approved_orchestrator_hosts, clock=clock
         )
         backend: ChatBackend | None = None
-        if engine is not None:
+        engine: object | None = None
+        metadata: ModelMetadataSource | None = None
+        if built is not None:
             from chatlpt.adapters.engine import BufferedEngineChat
 
+            engine, metadata = built
             backend = BufferedEngineChat(engine, clock, app=settings.chat_app)
         oauth: dict[str, OAuthProvider] = {}
         if settings.google_client_id and settings.google_client_secret:
@@ -118,6 +132,7 @@ class Application:
             prices=FilePriceSource(Path(settings.pricing_file)),
             oauth=oauth,
             engine=engine,
+            metadata=metadata,
         )
 
     async def start(self) -> None:
@@ -173,6 +188,8 @@ class Application:
             chat_available, reason = self.backend.ready()
         checks.append(Check(name="chat", ok=chat_available, detail=reason))
         info = await self.context.model(self.settings.chat_app)
+        if info is None and self._metadata is not None:
+            info = self._metadata.model_from_discovery(self.settings.chat_app)
         return AppHealth(
             ready=all(c.ok for c in checks if c.name == "database"),
             version=package_version(),

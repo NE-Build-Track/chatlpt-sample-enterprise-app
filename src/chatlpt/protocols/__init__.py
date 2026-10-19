@@ -106,7 +106,9 @@ class UsageLedger(Protocol):
 
     async def update_wholesale(self, message_id: UUID, wholesale: WholesaleCost) -> None: ...
 
-    async def pending_wholesale(self, limit: int = 100) -> list[UsageRecord]: ...
+    async def pending_wholesale(
+        self, limit: int = 100
+    ) -> list[UsageRecord]: ...  # paid jobs still pending or "none"
 
     async def totals(self, user_id: UUID | None, start: datetime, end: datetime) -> UsageTotals: ...
 
@@ -150,6 +152,12 @@ class ChatBackend(Protocol):
     async def report_usage(self, user_id: UUID, job_id: UUID, usage: TokenUsage) -> None: ...
 
     def ready(self) -> tuple[bool, str | None]: ...  # (chat available, reason when not)
+
+
+class ModelMetadataSource(Protocol):
+    """What the runner said about the model in its discovery entry, if anything (free; D14)."""
+
+    def model_from_discovery(self, app: str) -> ModelInfo | None: ...
 
 
 class ModelInfoCache(Protocol):

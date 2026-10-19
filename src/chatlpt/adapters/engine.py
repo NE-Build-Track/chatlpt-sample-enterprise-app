@@ -185,8 +185,8 @@ def parse_completion(data: dict[str, Any]) -> list[ReplyChunk]:
     if isinstance(reasoning, str) and reasoning:
         chunks.append(ReplyChunk(kind="reasoning", text=reasoning))
     content = message.get("content")
-    if isinstance(content, str) and content:
-        chunks.append(ReplyChunk(kind="content", text=content))
+    if isinstance(content, str) and content.strip():
+        chunks.append(ReplyChunk(kind="content", text=content.strip("\n")))
     usage = parse_usage(data.get("usage"))
     if usage is not None:
         chunks.append(ReplyChunk(kind="usage", usage=usage))

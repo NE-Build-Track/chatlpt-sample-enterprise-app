@@ -46,3 +46,23 @@ def test_fit_always_keeps_the_last_turn_even_when_it_is_too_big() -> None:
     history = [ChatTurn(role="user", content="y" * 10_000)]
     fitted = ContextService.fit("sys", history, window=100, reserve=50)
     assert len(fitted) == 2 and fitted[1].content == history[0].content
+
+
+async def test_discovery_metadata_wins_and_costs_nothing() -> None:
+    from chatlpt.contracts import ModelInfo
+
+    class Advertised:
+        def model_from_discovery(self, app: str) -> ModelInfo | None:
+            return ModelInfo(
+                app=app, model_id="Qwen3.8-27B", max_model_len=131072, observed_at=FixedClock().now()
+            )
+
+    backend, store, clock = ScriptedBackend(max_model_len=40_960), MemoryStore(), FixedClock()
+    context = ContextService(
+        backend, store, clock, ttl=timedelta(hours=24), override=None, metadata=Advertised()
+    )
+    assert await context.window(uuid4(), APP) == 131072
+    assert backend.model_info_calls == 0  # no paid call
+    cached = await store.get_model_info(APP)
+    assert cached is not None and cached.max_model_len == 131072 and cached.observed_at == clock.now()
+    assert await context.window(uuid4(), APP) == 131072  # cache already matches; nothing rewritten

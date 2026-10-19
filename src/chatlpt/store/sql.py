@@ -245,7 +245,10 @@ class SqlStore:
     async def pending_wholesale(self, limit: int = 100) -> list[UsageRecord]:
         query = (
             select(t.usage_records)
-            .where(t.usage_records.c.wholesale_status == "pending")
+            .where(
+                t.usage_records.c.wholesale_status.in_(("pending", "none")),
+                t.usage_records.c.job_id.is_not(None),
+            )
             .order_by(t.usage_records.c.created_at)
             .limit(limit)
         )

@@ -53,13 +53,16 @@ async def test_wholesale_sync_fills_pending_costs(
     job_id = events[-1].message.job_id  # type: ignore[union-attr]
     assert job_id is not None
     assert await application.chat.sync_wholesale() == 0  # still pending at the engine
+    backend.costs[job_id] = WholesaleCost(status="none")  # the engine's "not yet known" for ~16 s after a job
+    assert await application.chat.sync_wholesale() == 0
+    assert len(await store.pending_wholesale()) == 1
     backend.costs[job_id] = WholesaleCost(status="delivered", amount=Money(amount=Decimal("0.000111")))
     assert await application.chat.sync_wholesale() == 1
     message = await store.get_message(events[-1].message.id)  # type: ignore[union-attr]
     assert message is not None and message.wholesale is not None
-    assert message.wholesale.status == "delivered" and message.wholesale.amount == Money(
-        amount=Decimal("0.000111")
-    )
+    assert message.wholesale.status == "delivered"
+    assert message.wholesale.amount == Money(amount=Decimal("0.000111"))
+    assert message.wholesale.orchestrator_url == "https://orch.test:8935"  # kept from the reply
     totals = await store.totals(
         user.id, application.clock.now().replace(day=1), application.clock.now().replace(day=28)
     )

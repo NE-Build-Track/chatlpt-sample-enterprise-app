@@ -252,11 +252,15 @@ class ChatService:
                     extra={"event": "billing.wholesale_failed", "error": str(error)},
                 )
                 continue
-            if cost.status == "pending":
-                continue
-            await self._ledger.update_wholesale(
-                record.message_id, cost.model_copy(update={"updated_at": self._clock.now()})
+            if cost.status in ("pending", "none"):
+                continue  # "none" is the engine's "not yet known" for a paid job; never a zero
+            filled_cost = cost.model_copy(
+                update={
+                    "updated_at": self._clock.now(),
+                    "orchestrator_url": record.wholesale.orchestrator_url,
+                }
             )
+            await self._ledger.update_wholesale(record.message_id, filled_cost)
             filled += 1
         return filled
 

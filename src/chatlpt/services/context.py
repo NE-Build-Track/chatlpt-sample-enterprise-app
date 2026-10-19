@@ -7,7 +7,7 @@ from uuid import UUID
 
 from chatlpt.contracts import ChatTurn, ModelInfo
 from chatlpt.errors import AppError
-from chatlpt.protocols import ChatBackend, Clock, ModelInfoCache
+from chatlpt.protocols import ChatBackend, Clock, ModelInfoCache, ModelMetadataSource
 from chatlpt.utils import estimate_tokens
 
 _LOG = logging.getLogger(__name__)
@@ -24,14 +24,29 @@ class ContextService:
         *,
         ttl: timedelta,
         override: int | None,
+        metadata: ModelMetadataSource | None = None,
     ) -> None:
         self._backend = backend
+        self._metadata = metadata
         self._cache = cache
         self._clock = clock
         self._ttl = ttl
         self._override = override
 
     async def window(self, user_id: UUID, app: str) -> int:
+        """Discovery metadata first (free), then the cache, then ``GET /v1/models`` (paid), then fallbacks."""
+        advertised = self._metadata.model_from_discovery(app) if self._metadata is not None else None
+        if advertised is not None:
+            cached = await self._cache.get_model_info(app)
+            if (
+                cached is None
+                or cached.max_model_len != advertised.max_model_len
+                or cached.model_id != advertised.model_id
+            ):
+                await self._cache.put_model_info(
+                    advertised.model_copy(update={"observed_at": self._clock.now()})
+                )
+            return advertised.max_model_len
         cached = await self._cache.get_model_info(app)
         if cached is not None and self._clock.now() - cached.observed_at < self._ttl:
             return cached.max_model_len

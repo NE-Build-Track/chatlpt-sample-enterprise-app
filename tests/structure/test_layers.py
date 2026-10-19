@@ -28,7 +28,8 @@ ALLOWED: dict[str, set[str]] = {
 
 # third-party package -> the only modules (path prefixes under src/chatlpt) that may import it
 CONFINED: dict[str, tuple[str, ...]] = {
-    "livepeer_builder": ("adapters/engine.py", "runtime/engine.py"),
+    "livepeer_builder": ("adapters/engine.py", "adapters/discovery.py", "runtime/engine.py"),
+    "livepeer_gateway": ("adapters/discovery.py",),
     "authlib": ("adapters/oauth.py",),
     "httpx": ("adapters/oauth.py",),
     "argon2": ("adapters/passwords.py",),

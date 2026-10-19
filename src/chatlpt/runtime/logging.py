@@ -15,7 +15,10 @@ _SECRET_WORDS = ("token", "secret", "password", "api_key", "payment_key", "autho
 
 
 def _redact(key: str, value: Any) -> Any:
-    return "[redacted]" if any(word in key.lower() for word in _SECRET_WORDS) else value
+    name = key.lower()
+    if name.endswith("_tokens"):
+        return value  # token counts are usage, not credentials
+    return "[redacted]" if any(word in name for word in _SECRET_WORDS) else value
 
 
 class JsonFormatter(logging.Formatter):

@@ -234,7 +234,11 @@ class MemoryStore:
             self.messages[message_id] = self.messages[message_id].model_copy(update={"wholesale": wholesale})
 
     async def pending_wholesale(self, limit: int = 100) -> list[UsageRecord]:
-        pending = [x for x in self.records.values() if x.wholesale.status == "pending"]
+        pending = [
+            x
+            for x in self.records.values()
+            if x.wholesale.status in ("pending", "none") and x.job_id is not None
+        ]
         return sorted(pending, key=lambda x: x.created_at)[:limit]
 
     async def totals(self, user_id: UUID | None, start: datetime, end: datetime) -> UsageTotals:
