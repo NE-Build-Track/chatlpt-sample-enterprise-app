@@ -1,0 +1,120 @@
+"""Conversation and reply routes. A reply is a server-sent event stream.
+
+See ARCHITECTURE.md#a-reply-end-to-end.
+"""
+
+import json
+from collections.abc import AsyncIterator, Awaitable, Callable
+from datetime import UTC, datetime
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+
+from chatlpt.contracts import (
+    Conversation,
+    Message,
+    ModelInfo,
+    NewMessage,
+    PriceTable,
+    RenameConversation,
+    ReplyEvent,
+    UsageTotals,
+    User,
+)
+from chatlpt.http.sessions import csrf_guard
+from chatlpt.runtime import Application
+
+
+class ConversationOut(BaseModel):
+    conversation: Conversation
+    messages: list[Message]
+    totals: UsageTotals
+
+
+class ModelOut(BaseModel):
+    app: str
+    chat_available: bool
+    reason: str | None
+    model: ModelInfo | None
+    prices: PriceTable
+
+
+def month_bounds(now: datetime) -> tuple[datetime, datetime]:
+    start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    end = (
+        start.replace(year=start.year + 1, month=1)
+        if start.month == 12
+        else start.replace(month=start.month + 1)
+    )
+    return start, end
+
+
+def chat_router(app: Application, current_user: Callable[[Request], Awaitable[User]]) -> APIRouter:
+    router = APIRouter(prefix="/api", tags=["chat"], dependencies=[Depends(csrf_guard)])
+    Current = Annotated[User, Depends(current_user)]
+
+    @router.get("/model", response_model=ModelOut)
+    async def model(user: Current) -> ModelOut:
+        available, reason = (False, "engine not configured") if app.backend is None else app.backend.ready()
+        return ModelOut(
+            app=app.settings.chat_app,
+            chat_available=available,
+            reason=reason,
+            model=await app.context.model(app.settings.chat_app),
+            prices=app.billing_prices(),
+        )
+
+    @router.get("/conversations", response_model=list[Conversation])
+    async def list_conversations(user: Current) -> list[Conversation]:
+        return await app.conversations.list_for(user)
+
+    @router.post("/conversations", response_model=Conversation, status_code=201)
+    async def create_conversation(user: Current) -> Conversation:
+        return await app.conversations.create(user)
+
+    @router.get("/conversations/{conversation_id}", response_model=ConversationOut)
+    async def get_conversation(conversation_id: UUID, user: Current) -> ConversationOut:
+        conversation = await app.conversations.get(user, conversation_id)
+        return ConversationOut(
+            conversation=conversation,
+            messages=await app.conversations.messages(user, conversation_id),
+            totals=await app.store.conversation_totals(conversation_id),
+        )
+
+    @router.patch("/conversations/{conversation_id}", response_model=Conversation)
+    async def rename(conversation_id: UUID, body: RenameConversation, user: Current) -> Conversation:
+        return await app.conversations.rename(user, conversation_id, body.title)
+
+    @router.delete("/conversations/{conversation_id}", status_code=204)
+    async def delete(conversation_id: UUID, user: Current) -> None:
+        await app.conversations.delete(user, conversation_id)
+
+    @router.post("/conversations/{conversation_id}/messages")
+    async def send(conversation_id: UUID, body: NewMessage, user: Current) -> StreamingResponse:
+        await app.conversations.get(user, conversation_id)  # 404 before the stream starts
+        queue = app.chat.start_reply(user, conversation_id, body)
+
+        async def events() -> AsyncIterator[bytes]:
+            while (event := await queue.get()) is not None:
+                yield sse(event)
+
+        return StreamingResponse(
+            events(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    @router.get("/usage/me", response_model=UsageTotals)
+    async def my_usage(user: Current) -> UsageTotals:
+        start, end = month_bounds(app.clock.now().astimezone(UTC))
+        return await app.store.totals(user.id, start, end)
+
+    return router
+
+
+def sse(event: ReplyEvent) -> bytes:
+    data = json.dumps(event.model_dump(mode="json", exclude_none=True))
+    return f"event: {event.type}\ndata: {data}\n\n".encode()

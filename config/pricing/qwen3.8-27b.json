@@ -1,0 +1,12 @@
+{
+  "model": "qwen3.8-27b",
+  "vendor": "Alibaba Cloud Model Studio",
+  "region": "Singapore (International)",
+  "currency": "USD",
+  "input_per_m": "0.5",
+  "output_per_m": "3",
+  "cached_input_per_m": "0.1",
+  "thinking_output_per_m": null,
+  "source_url": "https://www.alibabacloud.com/help/en/model-studio/qwen3-8-27b",
+  "observed_at": "2026-10-19T00:00:00Z"
+}

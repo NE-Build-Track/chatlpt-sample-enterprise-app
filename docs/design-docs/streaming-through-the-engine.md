@@ -30,15 +30,17 @@ before the call, accurate `payment_sent` and `manifest_ids`, cost classification
 
 ```python
 class JobStream(Protocol):
-    job: Job                     # state "running" until the stream ends
+    job: Job  # state "running" until the stream ends
     status_code: int
     content_type: str
+
     def __aiter__(self) -> AsyncIterator[bytes]: ...
-    async def aclose(self) -> None: ...   # caller gave up; see "disconnect"
+    async def aclose(self) -> None: ...  # caller gave up; see "disconnect"
+
 
 class JobService:
-    async def run(self, actor, request) -> JobResult: ...        # unchanged
-    async def stream(self, actor, request) -> JobStream: ...     # new
+    async def run(self, actor, request) -> JobResult: ...  # unchanged
+    async def stream(self, actor, request) -> JobStream: ...  # new
 ```
 
 `JobRequest` gains `idle_timeout_s: float | None` (gap between chunks). `timeout_s` stays the total
@@ -48,14 +50,16 @@ budget. `mode` stays `immediate`; streaming is a delivery choice, not an executi
 
 ```python
 class RunnerTransport(Protocol):
-    async def call(self, runner, request, credential) -> RunnerReply: ...    # unchanged
-    async def open(self, runner, request, credential) -> RunnerStream: ...   # new
+    async def call(self, runner, request, credential) -> RunnerReply: ...  # unchanged
+    async def open(self, runner, request, credential) -> RunnerStream: ...  # new
+
 
 class RunnerStream(Protocol):
     status_code: int
     content_type: str
-    manifest_ids: tuple[str, ...]   # signed sessions so far
+    manifest_ids: tuple[str, ...]  # signed sessions so far
     payment_sent: bool
+
     def __aiter__(self) -> AsyncIterator[bytes]: ...
     async def aclose(self) -> None: ...
 ```

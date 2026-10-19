@@ -5,15 +5,21 @@ debt), B (tested, minor debt), C (works, gaps), D (scaffold), – (not started).
 
 | Area | Grade | Notes |
 | --- | --- | --- |
-| Docs and map | B | Written 2026-10-19; link check pending `scripts/check_docs.py` |
-| Contracts and layers | – | plan-01 |
-| Identity | – | plan-03 |
-| Conversations and chat | – | plan-04 |
-| Context window | – | plan-04 |
-| Billing (two books) | – | plan-04 |
-| Admin | – | plan-04 |
-| Store and migrations | – | plan-01 |
-| HTTP and SSE | – | plan-01, plan-04 |
-| UI | – | plan-01, plan-04 |
-| Deploy and images | – | plan-02 |
+| Docs and map | B | Link-checked by `scripts/check_docs.py`; generated docs drift-checked by `tests/store/test_durability.py` |
+| Contracts and layers | B | Frozen pydantic contracts; layering and confinement enforced by `tests/structure/` |
+| Identity | C | Email/password and provider linking tested; the OAuth adapters themselves are untested against real providers (plan-03) |
+| Conversations and chat | B | Reply pipeline tested with the scripted backend; not yet against a live engine (plan-02) |
+| Context window | B | Derivation, caching, TTL and fitting tested; token estimate is approximate (T1) |
+| Billing (two books) | B | Retail exact and property-tested; wholesale mapping tested; live reconciliation pending (plan-02) |
+| Admin | C | Routes and permissions tested; no quotas (phase 2) |
+| Store and migrations | B | Contract suite runs on SQLite and the in-memory fake; migration drift test |
+| HTTP and SSE | B | Routes, CSRF, ownership and the SSE frame format tested |
+| UI | C | Builds, typed, zod at the boundary; only the money formatting is unit-tested; no browser test yet |
+| Deploy and images | D | Compose validates; images build; the stack has not run end to end (plan-02) |
 | Streaming (builder-core) | – | plan-05 |
+
+## Test coverage
+
+`uv run pytest --cov --cov-report=json && uv run python scripts/check_coverage.py`. The total floor is in
+`pyproject.toml`; per-layer floors in `scripts/check_coverage.py` protect the layers that guard money and
+correctness. Do not lower a floor to make a change pass.

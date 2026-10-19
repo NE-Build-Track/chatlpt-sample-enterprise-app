@@ -1,17 +1,29 @@
 # Qwen3.8-27B list prices (retail book)
 
-**Status: to be filled in plan-04** from Alibaba Cloud Model Studio's international (Singapore)
-price list, in USD per million tokens (D4). The machine-readable table is `config/pricing/qwen3.8-27b.json`
-and the app loads it at startup; this page explains it.
+Observed on **2026-10-19** at
+<https://www.alibabacloud.com/help/en/model-studio/qwen3-8-27b> (model id `qwen3.8-27b`), the
+Singapore (International) region, in USD (D4). The machine-readable copy the app loads is
+[`config/pricing/qwen3.8-27b.json`](../../config/pricing/qwen3.8-27b.json). Re-check the page before
+quoting; Alibaba notes these are original rates excluding promotions.
 
-| Field | Meaning |
-| --- | --- |
-| `input_per_m` | Prompt tokens not served from cache |
-| `cached_input_per_m` | Prompt tokens served from the vendor's context cache (if listed) |
-| `output_per_m` | Completion tokens in non-thinking mode |
-| `thinking_output_per_m` | Completion tokens (including reasoning) in thinking mode (if listed separately) |
-| `source_url`, `observed_at`, `region`, `currency` | Provenance |
+| Billing item | USD per 1M tokens | Used as |
+| --- | --- | --- |
+| Input | 0.50 | `input_per_m` |
+| Output | 3.00 | `output_per_m` |
+| Input, implicit cache hit | 0.10 | `cached_input_per_m` |
+| Explicit cache creation | 0.625 | not used (we never create explicit caches) |
+| Explicit cache read | 0.05 | not used |
 
-Rules: retail = prompt × input + completion × output (or thinking output when reasoning was
-returned). Tiered prices by input length, if the vendor lists them, are applied per request on the
-prompt token count. Prices are never computed from wholesale.
+Thinking and non-thinking modes share one price list, so `thinking_output_per_m` is `null` and
+reasoning tokens are priced as output. For reference, the Beijing region lists 0.424 input and
+1.696 output; it is not used.
+
+Model limits the vendor states: context window 1,000,000 tokens; max input 991,808 (983,616 in
+thinking mode); max output 131,072; max chain of thought 262,144. **These are the vendor's limits,
+not the Livepeer runner's.** The runner's own `max_model_len` governs the context window (D14).
+
+## Rule
+
+`retail = (uncached_prompt × 0.50 + cached_prompt × 0.10 + completion × 3.00) / 1,000,000`, where
+`cached_prompt` is `usage.prompt_tokens_details.cached_tokens` when the runner reports it, otherwise 0.
+Retail is never computed from wholesale, and wholesale is never computed from retail.
