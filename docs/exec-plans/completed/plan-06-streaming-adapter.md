@@ -31,12 +31,12 @@ Changes to the UI, the services or the stores: they were streaming-shaped from d
 - 2026-10-19: plan opened after the builder-core branch was shown live (its evidence: `2026-10-19-streaming-live`).
 - 2026-10-19: `StreamingEngineChat` and the SSE decoder in; the runtime picks it by capability; 386 tests. Deployed and
   shown live: first token at 1.4 s, 74 deltas, done at 2.6 s
-  ([evidence](../../references/evidence/2026-10-19-streamed-replies.md)). Plan complete; T7 remains until the
-  branch is pushed.
+  ([evidence](../../references/evidence/2026-10-19-streamed-replies.md)). Plan complete. Later that day the
+  branch was pushed and the pin became the git reference (T7 paid).
 
 ## Decision log
 
 - 2026-10-19: both adapters stay in `adapters/engine.py`; the runtime chooses by capability
   (`hasattr(engine.jobs, "stream")`), so the app runs against either engine release.
-- 2026-10-19: a vendored wheel stands in for the git pin until the branch is pushed (T7), because a
-  Docker build cannot reach an unpushed commit.
+- 2026-10-19: a vendored wheel stood in for the git pin until the branch was pushed later that day; the pin
+  is now the git reference and `vendor/` is gone (T7 paid).

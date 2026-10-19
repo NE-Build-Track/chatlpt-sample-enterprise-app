@@ -523,7 +523,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "itsdangerous", specifier = ">=2.2" },
-    { name = "livepeer-builder", path = "vendor/livepeer_builder-0.1.1.dev2+g973ac57-py3-none-any.whl" },
+    { name = "livepeer-builder", git = "https://github.com/NE-Build-Track/livepeer-builder-core.git?rev=973ac577288c44d26dc22889a68718b8f55e5ba2" },
     { name = "pydantic", extras = ["email"], specifier = ">=2.7" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.30" },
     { name = "uvicorn", specifier = ">=0.30" },
@@ -1170,7 +1170,7 @@ wheels = [
 [[package]]
 name = "livepeer-builder"
 version = "0.1.1.dev2+g973ac57"
-source = { path = "vendor/livepeer_builder-0.1.1.dev2+g973ac57-py3-none-any.whl" }
+source = { git = "https://github.com/NE-Build-Track/livepeer-builder-core.git?rev=973ac577288c44d26dc22889a68718b8f55e5ba2#973ac577288c44d26dc22889a68718b8f55e5ba2" }
 dependencies = [
     { name = "aiosqlite" },
     { name = "alembic" },
@@ -1180,24 +1180,6 @@ dependencies = [
     { name = "pydantic" },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
-wheels = [
-    { filename = "livepeer_builder-0.1.1.dev2+g973ac57-py3-none-any.whl", hash = "sha256:0d612021d0812233a83af87738d7dde5d3d25259701c92571c2c1cbe0c3cf259" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiosqlite", specifier = ">=0.20" },
-    { name = "alembic", specifier = ">=1.13" },
-    { name = "asyncpg", marker = "extra == 'postgres'", specifier = ">=0.29" },
-    { name = "cryptography", specifier = ">=42" },
-    { name = "fastapi", marker = "extra == 'server'", specifier = ">=0.115" },
-    { name = "httpx", specifier = ">=0.27" },
-    { name = "livepeer-gateway", git = "https://github.com/NE-Build-Track/livepeer-python-gateway.git?rev=e6d243b1d8bcbc8c1f0262ddbc3239a9f5b83cf4" },
-    { name = "pydantic", specifier = ">=2.7" },
-    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.30" },
-    { name = "uvicorn", marker = "extra == 'server'", specifier = ">=0.30" },
-]
-provides-extras = ["postgres", "server"]
 
 [[package]]
 name = "livepeer-gateway"

@@ -1,7 +1,7 @@
 # livepeer-builder (embedded)
 
-Pinned to branch **`tasks/m3/mz/stream-support`** of `NE-Build-Track/livepeer-builder-core` at `973ac57`
-(2026-10-19; vendored wheel until the branch is pushed, T7). Previously tag `v0.1.0` (commit `153f0de`). Source of truth: that repository's `ARCHITECTURE.md`, `docs/contracts/engine.md`,
+Pinned to branch **`tasks/m3/mz/stream-support`** of `NE-Build-Track/livepeer-builder-core` at commit
+`973ac57` (pushed 2026-10-19). Previously tag `v0.1.0` (commit `153f0de`). Source of truth: that repository's `ARCHITECTURE.md`, `docs/contracts/engine.md`,
 `docs/design-docs/extending-the-engine.md`.
 
 ## What we call

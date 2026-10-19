@@ -71,7 +71,7 @@ Each is a numbered decision in [docs/design-docs/decisions.md](docs/design-docs/
 | Assumption | Decision |
 | --- | --- |
 | Streaming is required, and is designed generically for builder-core, not patched into this app | D1, D20 |
-| builder-core is pinned to the streaming branch `tasks/m3/mz/stream-support` (vendored wheel until it is pushed) | D2 |
+| builder-core is pinned to the streaming branch `tasks/m3/mz/stream-support` at `973ac57` | D2 |
 | One shared application payment key; the app tracks tokens per user; both books are kept | D3 |
 | Retail prices are Alibaba Cloud's international list prices for Qwen3.8-27B, recorded in-repo with a date | D4 |
 | Email/password accounts in SQLite, self-signup open; Google (OIDC) and GitHub (OAuth 2.0) optional | D5, D6 |
@@ -192,8 +192,7 @@ Everything is an environment variable; `deploy/.env.example` lists each with its
 Replies stream token by token through the engine's `jobs.stream`, from builder-core branch
 `tasks/m3/mz/stream-support` (the generic design is in
 [docs/design-docs/streaming-through-the-engine.md](docs/design-docs/streaming-through-the-engine.md)).
-The runtime falls back to the buffered adapter when the engine has no `jobs.stream`. Until the branch
-is pushed the engine is installed from a wheel vendored under `vendor/`.
+The runtime falls back to the buffered adapter when the engine has no `jobs.stream`.
 
 ## Working in this repository
 
