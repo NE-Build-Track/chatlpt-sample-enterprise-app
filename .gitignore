@@ -35,3 +35,6 @@ deploy/config/pinned-certs/
 .idea/
 .vscode/
 *.swp
+
+# Per-worktree scratch (databases, logs, screenshots)
+.local/
