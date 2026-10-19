@@ -8,6 +8,7 @@ from chatlpt.testing import FixedClock
 
 APP = "blueclaw/chat/qwen3.8-27b"
 META = json.dumps({"blueclaw": 1, "model_id": "Qwen3.8-27B", "max_context": 131072})
+SMALLER = json.dumps({"model_id": "Qwen3.8-27B", "max_context": 40960})
 
 
 def entry(address: str, *runners: dict[str, Any]) -> dict[str, Any]:

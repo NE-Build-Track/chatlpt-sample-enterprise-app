@@ -49,6 +49,7 @@ class FilteredSignerDiscovery:
         )
         kept: list[dict[str, Any]] = []
         dropped = 0
+        advertised: list[ModelInfo] = []
         for entry in entries:
             if not isinstance(entry, dict):
                 continue
@@ -59,7 +60,13 @@ class FilteredSignerDiscovery:
                 continue
             kept.append({**entry, "runners": runners})
             for runner in runners:
-                self._remember(runner.get("metadata"))
+                info = self._parse(runner.get("metadata"))
+                if info is not None:
+                    advertised.append(info)
+        if advertised:
+            # Orchestrators advertise different limits for the same app (19 October: 40960 vs 131072). The
+            # engine may pick any of them, so the smallest window is the one every reply fits in.
+            self._model = min(advertised, key=lambda m: m.max_model_len)
         if dropped:
             _LOG.debug("discovery filtered", extra={"event": "discovery.filtered", "dropped": dropped})
         return tuple(runners_from_entries(kept))
@@ -73,20 +80,20 @@ class FilteredSignerDiscovery:
         host = urlparse(url).hostname if isinstance(url, str) else None
         return host is not None and host.lower() in self._hosts
 
-    def _remember(self, metadata: object) -> None:
+    def _parse(self, metadata: object) -> ModelInfo | None:
         if not isinstance(metadata, str) or not metadata:
-            return
+            return None
         try:
             parsed = json.loads(metadata)
         except ValueError:
-            return
+            return None
         if not isinstance(parsed, dict):
-            return
+            return None
         max_context = parsed.get("max_context")
         if not isinstance(max_context, int) or max_context <= 0:
-            return
+            return None
         model_id = parsed.get("model_id")
-        self._model = ModelInfo(
+        return ModelInfo(
             app=self._app,
             model_id=str(model_id) if model_id else "unknown",
             max_model_len=max_context,
