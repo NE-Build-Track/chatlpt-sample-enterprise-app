@@ -4,7 +4,11 @@ import { request } from "./client";
 import { User, UserRow } from "./schemas";
 
 export function useAdminUsers() {
-  return useQuery({ queryKey: ["admin", "users"], queryFn: () => request(z.array(UserRow), "/api/admin/users") });
+  return useQuery({
+    queryKey: ["admin", "users"],
+    queryFn: () => request(z.array(UserRow), "/api/admin/users"),
+    refetchInterval: (query) => (query.state.data?.some((r) => (r.totals?.wholesale_pending ?? 0) > 0) ? 15_000 : false),
+  });
 }
 
 export function useSetDisabled() {

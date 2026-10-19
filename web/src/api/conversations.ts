@@ -54,5 +54,11 @@ export function useModel() {
 }
 
 export function useMyUsage() {
-  return useQuery({ queryKey: ["usage", "me"], queryFn: () => request(UsageTotals, "/api/usage/me"), staleTime: 15_000 });
+  return useQuery({
+    queryKey: ["usage", "me"],
+    queryFn: () => request(UsageTotals, "/api/usage/me"),
+    staleTime: 15_000,
+    // Network costs arrive after the reply; keep polling the totals while any are pending.
+    refetchInterval: (query) => (query.state.data?.wholesale_pending ? 15_000 : false),
+  });
 }
