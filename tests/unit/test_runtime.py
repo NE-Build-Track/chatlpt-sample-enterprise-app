@@ -107,3 +107,23 @@ async def test_health_reports_a_broken_database() -> None:
     )
     health = await app.health()
     assert not health.ready and health.checks[0].detail == "disk gone"
+
+
+async def test_runtime_picks_the_streaming_adapter_when_the_engine_streams(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from chatlpt.adapters.engine import StreamingEngineChat
+
+    monkeypatch.setenv("LPB_SIGNER_URL", "http://signer.test:8937")
+    monkeypatch.setenv("LPB_DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path}/engine.db")
+    monkeypatch.delenv("LPB_BATTERIES_URL", raising=False)
+    settings = Settings(
+        database_url=f"sqlite+aiosqlite:///{tmp_path}/app.db",
+        session_secret=SecretStr("s"),
+        pricing_file=str(ROOT / "config" / "pricing" / "qwen3.8-27b.json"),
+    )
+    app = await Application.from_settings(settings)
+    try:
+        assert isinstance(app.backend, StreamingEngineChat)
+    finally:
+        await app.stop()

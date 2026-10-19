@@ -5,7 +5,7 @@ Accepted by the owner (Mike Zupper) on 2026-10-19 unless noted. Changing one is 
 | # | Decision | Why |
 | --- | --- | --- |
 | D1 | **Streaming is a requirement**, and the design must be generic to builder-core, not specific to ChatLPT. | Other apps on the engine need incremental text and media. |
-| D2 | Pin `livepeer-builder` to the **`v0.1.0`** tag (the M2 close-out). Move the pin to the streaming branch once it exists. The branch is `tasks/m3/mz/stream-support` off `releases/m3`. | v0.1.0 is the reviewed baseline; the streaming work decides the next pin. |
+| D2 | Pin `livepeer-builder` to the streaming branch `tasks/m3/mz/stream-support` (off `releases/m3`), at `973ac57` as of 2026-10-19; until the branch is pushed, a wheel built from it is vendored under `vendor/` (T7). Before 19 October the pin was the `v0.1.0` tag (the M2 close-out). | The app needs `jobs.stream`; the branch is the reviewed baseline-to-be. |
 | D3 | **One shared application payment key** (`per_application` mode). The app tracks per-user input and output tokens (retail) and the engine's per-job network cost (wholesale). Both are kept. | Enterprise pays the network once; the app owns customer accounting. |
 | D4 | **Retail prices come from Alibaba Cloud's list prices for Qwen3.8-27B**, international (Singapore) region, in USD, with input, cached input, output and thinking-mode output priced separately. The table is a dated file in the repository with its source URL. | A "hypothetical" cost like ChatGPT's needs a public, defensible rate. |
 | D5 | **Email and password accounts** in SQLite, **self-signup open**. No magic links. | Simplest credible enterprise login for a sample. |

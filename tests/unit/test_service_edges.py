@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 
 from chatlpt.contracts import NewMessage, NewUser, ReplyChunk, TokenUsage, UsageRecord, WholesaleCost
-from chatlpt.errors import AccessDenied, ChatUnavailable, NotFound
+from chatlpt.errors import AccessDenied, ChatUnavailable, NotFound, ReplyFailed
 from chatlpt.runtime import Application
 from chatlpt.testing import MemoryStore, ScriptedBackend
 from tests.unit.test_chat import collect
@@ -148,3 +148,30 @@ async def test_disabled_user_cannot_sign_in_with_a_provider(
         await application.auth.sign_in_with(
             OAuthIdentity(provider="github", subject="1", email="z@example.com")
         )
+
+
+async def test_partial_text_survives_a_failure_mid_stream(
+    application: Application, store: MemoryStore, backend: ScriptedBackend
+) -> None:
+    from chatlpt.testing.fakes import ScriptedReply
+
+    user = await application.auth.signup(NewUser(email="partial@example.com", password="correct horse"))
+    conversation = await application.conversations.create(user)
+
+    class Breaking(ScriptedReply):
+        async def _iterate(self):  # type: ignore[no-untyped-def]
+            yield ReplyChunk(kind="content", text="half an ")
+            raise ReplyFailed("stream cut", payment_sent=True, uncertain=True)
+
+    async def open_reply(*args: object, **kwargs: object) -> Breaking:
+        return Breaking(uuid4(), "https://orch.test", [])
+
+    backend.open_reply = open_reply  # type: ignore[method-assign]
+    events = await collect(application.chat.start_reply(user, conversation.id, NewMessage(content="go")))
+    assert [e.type for e in events] == ["start", "content", "error"]
+    reply = next(m for m in await store.list_messages(conversation.id) if m.role == "assistant")
+    assert (
+        reply.state == "uncertain"
+        and reply.content == "half an "
+        and reply.wholesale == WholesaleCost.pending()
+    )

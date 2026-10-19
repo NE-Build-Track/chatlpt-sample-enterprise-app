@@ -1,10 +1,12 @@
 """The ChatBackend over the embedded livepeer-builder engine (docs/references/builder-engine.md).
 
-``BufferedEngineChat`` is the v0.1.0 implementation (D20): one ``jobs.run`` per reply, the whole body
-yielded as a few chunks. The streaming implementation replaces this file when the engine's
-``jobs.stream`` lands (docs/design-docs/streaming-through-the-engine.md). Nothing else changes.
+Two implementations of the same port (D20): ``StreamingEngineChat`` uses the engine's ``jobs.stream``
+and yields reply deltas as the runner emits them (docs/design-docs/streaming-through-the-engine.md);
+``BufferedEngineChat`` uses ``jobs.run`` and yields the whole body at the end, for an engine without
+streaming. The runtime picks the first when the engine offers ``jobs.stream``.
 """
 
+import json
 import logging
 from collections.abc import AsyncIterator, Sequence
 from decimal import Decimal
@@ -26,6 +28,7 @@ from livepeer_builder import (
 from livepeer_builder.errors import EngineError
 from livepeer_builder.errors import NotFound as EngineNotFound
 
+from chatlpt.adapters.sse import SseDecoder
 from chatlpt.contracts import ChatParams, ChatTurn, ModelInfo, Money, ReplyChunk, TokenUsage, WholesaleCost
 from chatlpt.errors import ChatUnavailable, Conflict, NotFound, ReplyFailed
 from chatlpt.protocols import Clock
@@ -69,11 +72,20 @@ class BufferedReply:
 
 
 class BufferedEngineChat:
-    def __init__(self, engine: BuilderEngine, clock: Clock, *, app: str, max_attempts: int = 3) -> None:
+    def __init__(
+        self,
+        engine: BuilderEngine,
+        clock: Clock,
+        *,
+        app: str,
+        max_attempts: int = 3,
+        idle_timeout_s: float | None = None,
+    ) -> None:
         self._engine = engine
         self._clock = clock
         self.app = app
         self._max_attempts = max_attempts
+        self._idle_timeout_s = idle_timeout_s
 
     def ready(self) -> tuple[bool, str | None]:
         health = self._engine.health()
@@ -86,19 +98,21 @@ class BufferedEngineChat:
             return False, f"no runner advertises {self.app} on the approved orchestrators"
         return True, None
 
-    async def open_reply(
-        self, user_id: UUID, turns: Sequence[ChatTurn], params: ChatParams, operation_ref: str
-    ) -> BufferedReply:
+    def _request(
+        self, turns: Sequence[ChatTurn], params: ChatParams, operation_ref: str, *, stream: bool
+    ) -> JobRequest:
         payload: dict[str, Any] = {
             "messages": [{"role": t.role, "content": t.content} for t in turns],
             "max_tokens": params.max_output_tokens,
             "temperature": float(params.temperature),  # the wire format; never money
-            "stream": False,
+            "stream": stream,
             "chat_template_kwargs": {"enable_thinking": params.include_reasoning},
         }
+        if stream:
+            payload["stream_options"] = {"include_usage": True}
         if params.include_reasoning and params.thinking_token_budget is not None:
             payload["thinking_token_budget"] = params.thinking_token_budget
-        request = JobRequest(
+        return JobRequest(
             app=self.app,
             path=CHAT_PATH,
             method="POST",
@@ -106,7 +120,13 @@ class BufferedEngineChat:
             operation_ref=operation_ref,
             max_attempts=self._max_attempts,
             timeout_s=params.timeout_s,
+            idle_timeout_s=self._idle_timeout_s if stream else None,
         )
+
+    async def open_reply(
+        self, user_id: UUID, turns: Sequence[ChatTurn], params: ChatParams, operation_ref: str
+    ) -> BufferedReply:
+        request = self._request(turns, params, operation_ref, stream=False)
         result = await self._run(user_id, request)
         data = result.data if isinstance(result.data, dict) else {}
         attempt = result.job.attempts[-1] if result.job.attempts else None
@@ -164,13 +184,110 @@ class BufferedEngineChat:
             raise ReplyFailed(str(exc), payment_sent=False) from exc
 
 
+class StreamingReply:
+    """The ReplyStream over the engine's ``JobStream``: SSE frames become reply chunks as they arrive."""
+
+    def __init__(self, job_stream: Any, orchestrator_url: str | None) -> None:
+        self._stream = job_stream
+        self._orchestrator_url = orchestrator_url
+
+    @property
+    def job_id(self) -> UUID | None:
+        job_id = self._stream.job.id
+        return job_id if isinstance(job_id, UUID) else None
+
+    @property
+    def orchestrator_url(self) -> str | None:
+        return self._orchestrator_url
+
+    def __aiter__(self) -> AsyncIterator[ReplyChunk]:
+        return self._iterate()
+
+    async def _iterate(self) -> AsyncIterator[ReplyChunk]:
+        if not str(self._stream.content_type).startswith("text/event-stream"):
+            # The runner answered with one body (no stream support, or an error document): parse it whole.
+            body = b"".join([chunk async for chunk in self._stream])
+            try:
+                data = json.loads(body or b"{}")
+            except ValueError:
+                data = {}
+            for chunk in parse_completion(data if isinstance(data, dict) else {}):
+                yield chunk
+            return
+        decoder = SseDecoder()
+        finish_reason: str | None = None
+        usage: TokenUsage | None = None
+        try:
+            async for raw in self._stream:
+                for event in decoder.feed(raw):
+                    for chunk in _delta_chunks(event):
+                        yield chunk
+                    finish_reason = _finish_reason(event) or finish_reason
+                    usage = parse_usage(event.get("usage")) or usage
+        except JobFailed as exc:
+            raise failure_from(exc) from exc
+        for event in decoder.flush():
+            for chunk in _delta_chunks(event):
+                yield chunk
+            finish_reason = _finish_reason(event) or finish_reason
+            usage = parse_usage(event.get("usage")) or usage
+        if usage is not None:
+            yield ReplyChunk(kind="usage", usage=usage)
+        yield ReplyChunk(kind="done", finish_reason=finish_reason)
+
+
+class StreamingEngineChat(BufferedEngineChat):
+    """``jobs.stream`` per reply: the browser sees tokens as the runner produces them (D1, D20)."""
+
+    async def open_reply(  # type: ignore[override]
+        self, user_id: UUID, turns: Sequence[ChatTurn], params: ChatParams, operation_ref: str
+    ) -> StreamingReply:
+        request = self._request(turns, params, operation_ref, stream=True)
+        try:
+            job_stream = await self._engine.jobs.stream(actor_for(user_id), request)
+        except JobFailed as exc:
+            raise failure_from(exc) from exc
+        except (NoCapacity, NotProvisioned, ProviderUnavailable) as exc:
+            raise ChatUnavailable(str(exc)) from exc
+        except (OperationExists, OperationConflict) as exc:
+            raise Conflict(str(exc)) from exc
+        except EngineError as exc:
+            raise ReplyFailed(str(exc), payment_sent=False) from exc
+        attempts = job_stream.job.attempts
+        orchestrator = attempts[-1].orchestrator_url if attempts else None
+        return StreamingReply(job_stream, orchestrator)
+
+
+def _delta_chunks(event: dict[str, Any]) -> list[ReplyChunk]:
+    chunks: list[ReplyChunk] = []
+    choices = event.get("choices")
+    for choice in choices if isinstance(choices, list) else []:
+        raw_delta = choice.get("delta") if isinstance(choice, dict) else None
+        delta: dict[str, Any] = raw_delta if isinstance(raw_delta, dict) else {}
+        reasoning = delta.get("reasoning") or delta.get("reasoning_content")
+        if isinstance(reasoning, str) and reasoning:
+            chunks.append(ReplyChunk(kind="reasoning", text=reasoning))
+        content = delta.get("content")
+        if isinstance(content, str) and content:
+            chunks.append(ReplyChunk(kind="content", text=content))
+    return chunks
+
+
+def _finish_reason(event: dict[str, Any]) -> str | None:
+    choices = event.get("choices")
+    for choice in choices if isinstance(choices, list) else []:
+        if isinstance(choice, dict) and choice.get("finish_reason"):
+            return str(choice["finish_reason"])
+    return None
+
+
 def failure_from(exc: JobFailed) -> ChatUnavailable | ReplyFailed:
     failure = exc.job.failure
     if failure is None:
         return ReplyFailed(str(exc), payment_sent=False)
     if failure.kind in _UNAVAILABLE_KINDS:
         return ChatUnavailable(failure.message)
-    uncertain = failure.kind == "timeout" or exc.job.state == "uncertain"
+    uncertain = failure.kind in ("timeout", "abandoned") or exc.job.state == "uncertain"
     detail = failure.message if not failure.body else f"{failure.message}: {failure.body[:300]}"
     return ReplyFailed(detail, payment_sent=failure.payment_sent, uncertain=uncertain)
 

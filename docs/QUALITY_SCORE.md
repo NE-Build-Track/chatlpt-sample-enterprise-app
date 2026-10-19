@@ -8,7 +8,7 @@ debt), B (tested, minor debt), C (works, gaps), D (scaffold), – (not started).
 | Docs and map | B | Link-checked by `scripts/check_docs.py`; generated docs drift-checked by `tests/store/test_durability.py` |
 | Contracts and layers | B | Frozen pydantic contracts; layering and confinement enforced by `tests/structure/` |
 | Identity | C | Email/password and provider linking tested; the OAuth adapters themselves are untested against real providers (plan-03) |
-| Conversations and chat | B | Reply pipeline tested with the scripted backend and live against the engine (evidence 2026-10-19) |
+| Conversations and chat | B | Reply pipeline tested with the scripted backend; streamed live through the engine (evidence 2026-10-19) |
 | Context window | B | Derivation, caching, TTL and fitting tested; token estimate is approximate (T1) |
 | Billing (two books) | B | Retail exact and property-tested; wholesale filled and settled live; replies only (T6) |
 | Admin | C | Routes and permissions tested; no quotas (phase 2) |
@@ -16,7 +16,7 @@ debt), B (tested, minor debt), C (works, gaps), D (scaffold), – (not started).
 | HTTP and SSE | B | Routes, CSRF, ownership and the SSE frame format tested |
 | UI | C | Builds, typed, zod at the boundary; verified in a real browser by screenshot; no automated browser test yet |
 | Deploy and images | B | The full stack ran end to end with paid replies (evidence 2026-10-19); first-run script not yet exercised (T5) |
-| Streaming (builder-core) | – | plan-05 |
+| Streaming (builder-core) | B | Implemented and shown live on the branch; awaiting Mike's and Josh's review |
 
 ## Test coverage
 

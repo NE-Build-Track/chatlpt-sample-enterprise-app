@@ -112,10 +112,13 @@ class Application:
         engine: object | None = None
         metadata: ModelMetadataSource | None = None
         if built is not None:
-            from chatlpt.adapters.engine import BufferedEngineChat
+            from chatlpt.adapters.engine import BufferedEngineChat, StreamingEngineChat
 
             engine, metadata = built
-            backend = BufferedEngineChat(engine, clock, app=settings.chat_app)
+            adapter = StreamingEngineChat if hasattr(engine.jobs, "stream") else BufferedEngineChat
+            backend = adapter(
+                engine, clock, app=settings.chat_app, idle_timeout_s=settings.reply_idle_timeout_s
+            )
         oauth: dict[str, OAuthProvider] = {}
         if settings.google_client_id and settings.google_client_secret:
             oauth["google"] = GoogleProvider(

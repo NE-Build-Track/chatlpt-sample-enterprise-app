@@ -143,6 +143,8 @@ class ChatService:
         except ReplyFailed as error:
             failed = placeholder.model_copy(
                 update={
+                    "content": "".join(content),  # whatever arrived before the failure stays visible
+                    "reasoning": "".join(reasoning) or None,
                     "state": "uncertain" if error.uncertain else "failed",
                     "error": str(error),
                     "wholesale": WholesaleCost.pending() if error.payment_sent else None,

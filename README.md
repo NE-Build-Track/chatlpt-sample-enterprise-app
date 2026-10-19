@@ -8,9 +8,9 @@
 [![shadcn/ui](https://img.shields.io/badge/components-shadcn%2Fui-000000)](https://ui.shadcn.com/)
 [![TypeScript strict](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](web/tsconfig.json)
 [![Docker Compose](https://img.shields.io/badge/deploy-Docker%20Compose-2496ED?logo=docker&logoColor=white)](deploy/compose.yaml)
-[![livepeer-builder v0.1.0](https://img.shields.io/badge/livepeer--builder-v0.1.0%20(embedded)-00EB88)](https://github.com/NE-Build-Track/livepeer-builder-core)
+[![livepeer-builder streaming branch](https://img.shields.io/badge/livepeer--builder-m3%20stream--support%20(embedded)-00EB88)](https://github.com/NE-Build-Track/livepeer-builder-core)
 [![Model](https://img.shields.io/badge/model-Qwen3.8--27B%20on%20Livepeer-FF6A00)](docs/references/qwen-runner.md)
-[![Status](https://img.shields.io/badge/status-alpha%20%C2%B7%20plan%2001-orange)](docs/PLANS.md)
+[![Status](https://img.shields.io/badge/status-alpha%20%C2%B7%20streaming%20live-orange)](docs/PLANS.md)
 [![Agent-first](https://img.shields.io/badge/built-agent--first-8A2BE2)](docs/references/harness-engineering.md)
 
 A ChatGPT-style chat application that runs its model on the **Livepeer network** through the
@@ -22,7 +22,7 @@ tokens would cost at the model vendor's list price (**retail**).
 It is a **sample enterprise application**: a reference for embedding the engine in a Python backend,
 and a reference for building such an app agent-first, where the repository is the system of record.
 
-> Status: **alpha, plan 01 (foundation)**. See [docs/PLANS.md](docs/PLANS.md) for the order of work.
+> Status: **alpha; paid, streamed replies work end to end**. See [docs/PLANS.md](docs/PLANS.md) for the order of work.
 
 ## Contents
 
@@ -70,7 +70,7 @@ Each is a numbered decision in [docs/design-docs/decisions.md](docs/design-docs/
 | Assumption | Decision |
 | --- | --- |
 | Streaming is required, and is designed generically for builder-core, not patched into this app | D1, D20 |
-| builder-core is pinned to `v0.1.0` until the streaming branch `tasks/m3/mz/stream-support` exists | D2 |
+| builder-core is pinned to the streaming branch `tasks/m3/mz/stream-support` (vendored wheel until it is pushed) | D2 |
 | One shared application payment key; the app tracks tokens per user; both books are kept | D3 |
 | Retail prices are Alibaba Cloud's international list prices for Qwen3.8-27B, recorded in-repo with a date | D4 |
 | Email/password accounts in SQLite, self-signup open; Google (OIDC) and GitHub (OAuth 2.0) optional | D5, D6 |
@@ -187,11 +187,11 @@ Everything is an environment variable; `deploy/.env.example` lists each with its
 
 ## Streaming
 
-The engine at `v0.1.0` returns one buffered body, so today a reply appears when it completes. The
-generic design for streaming through the engine, proposed for builder-core, is in
-[docs/design-docs/streaming-through-the-engine.md](docs/design-docs/streaming-through-the-engine.md).
-ChatLPT's chat adapter is streaming-shaped already; when the branch lands, the pin moves and one
-file changes.
+Replies stream token by token through the engine's `jobs.stream`, from builder-core branch
+`tasks/m3/mz/stream-support` (the generic design is in
+[docs/design-docs/streaming-through-the-engine.md](docs/design-docs/streaming-through-the-engine.md)).
+The runtime falls back to the buffered adapter when the engine has no `jobs.stream`. Until the branch
+is pushed the engine is installed from a wheel vendored under `vendor/`.
 
 ## Working in this repository
 

@@ -54,6 +54,9 @@ class Settings(Contract):
     include_reasoning: bool = True
     thinking_token_budget: int | None = Field(default=4096, ge=1)  # caps the chain of thought (vLLM/Qwen)
     reply_timeout_s: float = Field(default=300.0, gt=0, le=3600)
+    reply_idle_timeout_s: float = Field(
+        default=60.0, gt=0, le=3600
+    )  # longest silence inside a streamed reply
     context_window_override: int | None = Field(default=None, ge=1)  # last resort (D14)
     model_info_ttl_hours: int = Field(default=24, ge=1)
     history_turn_limit: int = Field(default=60, ge=1)

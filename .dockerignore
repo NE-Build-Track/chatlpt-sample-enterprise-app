@@ -1,0 +1,14 @@
+.git
+.venv
+.local
+.mypy_cache
+.pytest_cache
+.ruff_cache
+.hypothesis
+coverage.json
+web/node_modules
+web/dist
+deploy/secrets
+deploy/.env
+deploy/config/pinned-certs
+**/__pycache__

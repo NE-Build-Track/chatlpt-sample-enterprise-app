@@ -11,4 +11,4 @@ observed. Re-check before relying on one.
 | [orchestrators.md](orchestrators.md) | The approved orchestrators and what they advertise |
 | [payment-stack.md](payment-stack.md) | Clearinghouse Batteries and the node remote signer: pins, config, bootstrap |
 | [harness-engineering.md](harness-engineering.md) | The approach this repository follows, and where it came from |
-| [evidence/](evidence/) | Dated runtime evidence: [2026-10-19 first paid replies](evidence/2026-10-19-first-paid-replies.md) |
+| [evidence/](evidence/) | Dated runtime evidence: [2026-10-19 first paid replies](evidence/2026-10-19-first-paid-replies.md), [2026-10-19 streamed replies](evidence/2026-10-19-streamed-replies.md) |

@@ -15,7 +15,7 @@ acceptance checks pass, in the same commit. Known shortcuts go to
 | [plan-02-payments-stack](exec-plans/completed/plan-02-payments-stack.md) | Compose with Batteries, signer and the shared allocation; first paid reply end to end | completed 2026-10-19 |
 | plan-03-accounts | Email/password, Google, GitHub, sessions, admin list | next |
 | plan-04-chat-and-billing | Conversations, replies, context window, two books, admin page | next |
-| plan-05-engine-streaming (builder-core) | `tasks/m3/mz/stream-support`: contract, transport, REST, tests | exec plan drafted in builder-core, awaiting review |
-| plan-06-streaming-adapter | Move the pin, swap `adapters/engine.py`, verify deltas end to end | after 05 |
+| plan-05-engine-streaming (builder-core) | `tasks/m3/mz/stream-support`: contract, transport, REST, tests | implemented and shown live 2026-10-19 (builder-core commit `973ac57`), awaiting review |
+| [plan-06-streaming-adapter](exec-plans/completed/plan-06-streaming-adapter.md) | Move the pin, swap `adapters/engine.py`, verify deltas end to end | completed 2026-10-19 |
 
 Small changes do not need a plan; they need a test and a sentence in the commit.
