@@ -34,6 +34,7 @@ class Message(Contract):
     usage: TokenUsage | None = None
     retail: Money | None = None
     wholesale: WholesaleCost | None = None
+    finish_reason: str | None = None  # the runner's own: "stop", "length" (cut off at the output limit), ...
     error: str | None = None
     created_at: datetime
 
@@ -52,6 +53,7 @@ class ChatParams(Contract):
     temperature: Decimal = Field(ge=0, le=2)
     max_output_tokens: int = Field(ge=1)
     include_reasoning: bool = True
+    thinking_token_budget: int | None = Field(default=None, ge=1)
     timeout_s: float = Field(default=300.0, gt=0, le=3600)
 
 

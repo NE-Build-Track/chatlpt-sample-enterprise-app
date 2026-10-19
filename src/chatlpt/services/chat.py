@@ -124,6 +124,7 @@ class ChatService:
         content: list[str] = []
         reasoning: list[str] = []
         usage: TokenUsage | None = None
+        finish_reason: str | None = None
         try:
             stream = await self._backend.open_reply(
                 user.id, fitted, self._params, operation_ref=str(placeholder.id)
@@ -137,6 +138,8 @@ class ChatService:
                     yield ReplyEvent(type="reasoning", text=chunk.text)
                 elif chunk.kind == "usage" and chunk.usage is not None:
                     usage = chunk.usage
+                elif chunk.kind == "done":
+                    finish_reason = chunk.finish_reason
         except ReplyFailed as error:
             failed = placeholder.model_copy(
                 update={
@@ -169,6 +172,7 @@ class ChatService:
             usage,
             stream.job_id,
             stream.orchestrator_url,
+            finish_reason,
         )
         yield ReplyEvent(type="done", message=final)
 
@@ -181,6 +185,7 @@ class ChatService:
         usage: TokenUsage | None,
         job_id: UUID | None,
         orchestrator_url: str | None,
+        finish_reason: str | None = None,
     ) -> Message:
         now = self._clock.now()
         retail = (
@@ -198,6 +203,7 @@ class ChatService:
                 "orchestrator_url": orchestrator_url,
                 "usage": usage,
                 "retail": retail,
+                "finish_reason": finish_reason,
                 "wholesale": wholesale.model_copy(update={"orchestrator_url": orchestrator_url}),
             }
         )

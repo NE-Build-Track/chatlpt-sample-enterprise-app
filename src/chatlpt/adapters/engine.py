@@ -96,6 +96,8 @@ class BufferedEngineChat:
             "stream": False,
             "chat_template_kwargs": {"enable_thinking": params.include_reasoning},
         }
+        if params.include_reasoning and params.thinking_token_budget is not None:
+            payload["thinking_token_budget"] = params.thinking_token_budget
         request = JobRequest(
             app=self.app,
             path=CHAT_PATH,

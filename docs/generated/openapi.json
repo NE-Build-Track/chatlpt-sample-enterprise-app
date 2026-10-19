@@ -224,6 +224,17 @@
             ],
             "title": "Error"
           },
+          "finish_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Reason"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",

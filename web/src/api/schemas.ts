@@ -42,6 +42,7 @@ export const Message = z.object({
   usage: TokenUsage.nullable().optional(),
   retail: Money.nullable().optional(),
   wholesale: WholesaleCost.nullable().optional(),
+  finish_reason: z.string().nullable().optional(),
   error: z.string().nullable().optional(),
   created_at: z.string(),
 });

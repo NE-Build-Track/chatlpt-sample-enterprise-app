@@ -91,5 +91,6 @@ erDiagram
 | `wholesale_status` | VARCHAR(24) | yes |  |
 | `wholesale_usd` | VARCHAR(64) | yes |  |
 | `wholesale_updated_at` | DATETIME | yes |  |
+| `finish_reason` | VARCHAR(32) | yes |  |
 | `error` | TEXT | yes |  |
 | `created_at` | DATETIME | no |  |

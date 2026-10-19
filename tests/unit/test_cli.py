@@ -24,9 +24,9 @@ def test_migrate_revision_and_smoke(
     monkeypatch.delenv("LPB_SIGNER_URL", raising=False)
     monkeypatch.delenv("LPB_DISCOVERY_URL", raising=False)
     assert main(["migrate"]) == 0
-    assert json.loads(capsys.readouterr().out)["revision"] == "0001"
+    assert json.loads(capsys.readouterr().out)["revision"] == "0002"
     assert main(["revision"]) == 0
-    assert json.loads(capsys.readouterr().out) == {"database": "0001", "package": "0001"}
+    assert json.loads(capsys.readouterr().out) == {"database": "0002", "package": "0002"}
     assert main(["smoke"]) == 0
     assert json.loads(capsys.readouterr().out)["ready"] is True
 

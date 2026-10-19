@@ -35,6 +35,15 @@ export function MessageItem({ message, streaming = false }: { message: Message; 
           Payment went out but the reply did not arrive. The network cost, if any, will show here when it is known.
         </p>
       )}
+      {message.state === "complete" && message.finish_reason === "length" && (
+        <p className="text-sm text-muted-foreground">
+          {message.content
+            ? "This reply was cut off at the output limit."
+            : `The model used its whole output budget while thinking${
+                message.usage ? ` (${formatTokens(message.usage.completion_tokens)} tokens)` : ""
+              } and produced no answer. Try again, or ask for a shorter answer.`}
+        </p>
+      )}
       {message.state === "complete" && <CostLine message={message} />}
     </div>
   );

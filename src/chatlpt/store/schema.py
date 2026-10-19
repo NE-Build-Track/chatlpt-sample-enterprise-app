@@ -65,6 +65,7 @@ messages = Table(
     Column("wholesale_status", String(24), nullable=True),
     Column("wholesale_usd", String(DEC), nullable=True),
     Column("wholesale_updated_at", DateTime(timezone=True), nullable=True),
+    Column("finish_reason", String(32), nullable=True),
     Column("error", Text, nullable=True),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Index("ix_messages_conversation_created", "conversation_id", "created_at"),

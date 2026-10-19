@@ -180,7 +180,7 @@ Everything is an environment variable; `deploy/.env.example` lists each with its
 | `CHATLPT_SESSION_SECRET` | Signs session cookies |
 | `CHATLPT_ADMIN_EMAILS` | Comma-separated admins |
 | `CHATLPT_GOOGLE_CLIENT_ID/SECRET`, `CHATLPT_GITHUB_CLIENT_ID/SECRET` | Enable each sign-in button |
-| `CHATLPT_SYSTEM_PROMPT`, `CHATLPT_TEMPERATURE`, `CHATLPT_MAX_OUTPUT_TOKENS` | Model defaults |
+| `CHATLPT_SYSTEM_PROMPT`, `CHATLPT_TEMPERATURE`, `CHATLPT_MAX_OUTPUT_TOKENS`, `CHATLPT_THINKING_TOKEN_BUDGET` | Model defaults; the output limit covers answer plus thinking |
 | `CHATLPT_CONTEXT_WINDOW_OVERRIDE` | Last-resort override of the derived context window |
 | `CHATLPT_PRICING_FILE` | The retail price table (`config/pricing/qwen3.8-27b.json`) |
 | `LPB_*` | The embedded engine: signer, Batteries, shared key, database. See [payment-stack](docs/references/payment-stack.md) |

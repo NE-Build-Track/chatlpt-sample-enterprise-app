@@ -85,6 +85,7 @@ def message_from(row: Mapping[Any, Any]) -> Message:
         usage=usage_from(row),
         retail=_money(row["retail_usd"]),
         wholesale=wholesale_from(row),
+        finish_reason=row["finish_reason"],
         error=row["error"],
         created_at=utc(row["created_at"]),
     )
@@ -112,6 +113,7 @@ def message_values(message: Message) -> dict[str, Any]:
         if wholesale is None or wholesale.amount is None
         else str(wholesale.amount.amount),
         "wholesale_updated_at": None if wholesale is None else wholesale.updated_at,
+        "finish_reason": message.finish_reason,
         "error": message.error,
         "created_at": message.created_at,
     }
