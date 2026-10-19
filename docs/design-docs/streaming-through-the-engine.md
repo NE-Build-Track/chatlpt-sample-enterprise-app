@@ -1,7 +1,8 @@
 # Streaming through the engine
 
-Status: **proposed** for builder-core on branch `tasks/m3/mz/stream-support` off `releases/m3`.
-This document is the design; the builder-core exec plan will carry the work. ChatLPT is the first
+Status: **proposed** for builder-core on branch `tasks/m3/mz/stream-support` off `releases/m3`. The
+exec plan that carries the work is `docs/exec-plans/active/streaming-jobs.md` on that branch (drafted
+2026-10-19, awaiting review). This document is the design as ChatLPT needs it. ChatLPT is the first
 consumer, but nothing here is specific to chat.
 
 ## Problem
@@ -105,7 +106,9 @@ byte end the response; the job record carries the outcome.
 
 `Runner` gains `version`, `gpu` and `metadata` (the up-to-1 KB string the node echoes from the
 runner's registration). Apps use it to derive model limits without a paid call when the runner
-publishes them. The engine never interprets it.
+publishes them; on 19 October the chat runner published `{"model_id": "Qwen3.8-27B", "max_context": 131072}`.
+The engine never interprets it. Until this lands, ChatLPT reads the raw entries itself
+(`adapters/discovery.py`).
 
 ## Consequences for builder-core
 
