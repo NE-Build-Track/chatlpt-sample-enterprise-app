@@ -63,10 +63,24 @@ async def test_wholesale_sync_fills_pending_costs(
     assert message.wholesale.status == "delivered"
     assert message.wholesale.amount == Money(amount=Decimal("0.000111"))
     assert message.wholesale.orchestrator_url == "https://orch.test:8935"  # kept from the reply
+    # the engine corrects the cost as more usage rows arrive; within the settle window we pick it up
+    backend.costs[job_id] = WholesaleCost(status="delivered", amount=Money(amount=Decimal("0.000222")))
+    assert await application.chat.sync_wholesale() == 1
+    assert await application.chat.sync_wholesale() == 0  # unchanged: nothing rewritten
+    application.clock.advance(minutes=11)  # type: ignore[attr-defined]
+    backend.costs[job_id] = WholesaleCost(status="delivered", amount=Money(amount=Decimal("0.000333")))
+    assert await application.chat.sync_wholesale() == 0  # settled: no longer polled
+    corrected = await store.get_message(events[-1].message.id)  # type: ignore[union-attr]
+    assert (
+        corrected is not None and corrected.wholesale is not None and corrected.wholesale.amount is not None
+    )
+    assert corrected.wholesale.amount.amount == Decimal("0.000222")
     totals = await store.totals(
         user.id, application.clock.now().replace(day=1), application.clock.now().replace(day=28)
     )
-    assert totals.wholesale.amount == Decimal("0.000111") and totals.wholesale_pending == 0
+    assert (
+        totals.wholesale.amount == Decimal("0.000222") and totals.wholesale_pending == 0
+    )  # the corrected figure
 
 
 async def test_failure_after_payment_marks_the_reply_and_keeps_wholesale_pending(

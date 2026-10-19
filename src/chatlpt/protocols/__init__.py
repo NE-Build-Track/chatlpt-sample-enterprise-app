@@ -106,9 +106,11 @@ class UsageLedger(Protocol):
 
     async def update_wholesale(self, message_id: UUID, wholesale: WholesaleCost) -> None: ...
 
+    # paid jobs whose wholesale cost is still "pending" or "none" (the engine's "not yet known"), plus
+    # those filled since ``settling_since``: the engine corrects a cost as more usage rows arrive
     async def pending_wholesale(
-        self, limit: int = 100
-    ) -> list[UsageRecord]: ...  # paid jobs still pending or "none"
+        self, limit: int = 100, settling_since: datetime | None = None
+    ) -> list[UsageRecord]: ...
 
     async def totals(self, user_id: UUID | None, start: datetime, end: datetime) -> UsageTotals: ...
 

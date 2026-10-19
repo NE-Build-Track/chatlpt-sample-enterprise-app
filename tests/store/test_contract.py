@@ -125,6 +125,9 @@ async def test_ledger_totals_keep_pending_out_of_the_sum(app_store: AppStore) ->
     assert [x.message_id for x in await app_store.pending_wholesale()] == [first.message_id]
     await app_store.update_wholesale(first.message_id, paid)
     assert await app_store.pending_wholesale() == []
+    settling = await app_store.pending_wholesale(settling_since=NOW - timedelta(minutes=1))
+    assert len(settling) == 4  # every row was filled at NOW, so all are still settling
+    assert await app_store.pending_wholesale(settling_since=NOW + timedelta(seconds=1)) == []
     per_conversation = await app_store.conversation_totals(conversation_id)
     assert per_conversation.replies == 4 and per_conversation.wholesale.amount == Decimal("0.0004")
 

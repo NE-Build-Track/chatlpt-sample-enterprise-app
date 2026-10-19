@@ -91,6 +91,7 @@ class Application:
             clock,
             params=params,
             history_turn_limit=settings.history_turn_limit,
+            wholesale_settle_window=timedelta(minutes=settings.wholesale_settle_minutes),
         )
         self.admin = AdminService(store, store)
         self._prices = prices

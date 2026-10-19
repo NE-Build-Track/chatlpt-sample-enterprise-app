@@ -233,12 +233,16 @@ class MemoryStore:
         if message_id in self.messages:
             self.messages[message_id] = self.messages[message_id].model_copy(update={"wholesale": wholesale})
 
-    async def pending_wholesale(self, limit: int = 100) -> list[UsageRecord]:
-        pending = [
-            x
-            for x in self.records.values()
-            if x.wholesale.status in ("pending", "none") and x.job_id is not None
-        ]
+    async def pending_wholesale(
+        self, limit: int = 100, settling_since: datetime | None = None
+    ) -> list[UsageRecord]:
+        def unsettled(x: UsageRecord) -> bool:
+            if x.wholesale.status in ("pending", "none"):
+                return True
+            updated = x.wholesale.updated_at
+            return settling_since is not None and updated is not None and updated >= settling_since
+
+        pending = [x for x in self.records.values() if unsettled(x) and x.job_id is not None]
         return sorted(pending, key=lambda x: x.created_at)[:limit]
 
     async def totals(self, user_id: UUID | None, start: datetime, end: datetime) -> UsageTotals:

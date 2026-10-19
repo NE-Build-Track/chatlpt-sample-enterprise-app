@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import and_, delete, event, insert, select, update
+from sqlalchemy import ColumnElement, and_, delete, event, insert, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
@@ -242,13 +242,15 @@ class SqlStore:
                 )
             )
 
-    async def pending_wholesale(self, limit: int = 100) -> list[UsageRecord]:
+    async def pending_wholesale(
+        self, limit: int = 100, settling_since: datetime | None = None
+    ) -> list[UsageRecord]:
+        unsettled: ColumnElement[bool] = t.usage_records.c.wholesale_status.in_(("pending", "none"))
+        if settling_since is not None:
+            unsettled = or_(unsettled, t.usage_records.c.wholesale_updated_at >= settling_since)
         query = (
             select(t.usage_records)
-            .where(
-                t.usage_records.c.wholesale_status.in_(("pending", "none")),
-                t.usage_records.c.job_id.is_not(None),
-            )
+            .where(unsettled, t.usage_records.c.job_id.is_not(None))
             .order_by(t.usage_records.c.created_at)
             .limit(limit)
         )

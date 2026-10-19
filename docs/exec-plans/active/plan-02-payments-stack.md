@@ -27,17 +27,24 @@ of that. Budget for this plan: under $0.05.
 
 ## Acceptance
 
-- [ ] `docker compose -f deploy/compose.yaml ps` shows clearinghouse (healthy), signer and chatlpt up.
-- [ ] `GET /readyz` reports `chat_available: true` and the derived model id.
-- [ ] One reply completes; the message carries token counts, a retail amount and `wholesale: pending`.
-- [ ] Within a few minutes `wholesale.status` becomes `delivered` with an amount, and the admin page shows the margin.
-- [ ] Evidence page written with job id, orchestrator, tokens, retail, wholesale.
+- [x] `docker compose -f deploy/compose.yaml ps` shows clearinghouse (healthy), signer and chatlpt up.
+- [x] `GET /readyz` reports `chat_available: true` and the derived model id.
+- [x] One reply completes; the message carries token counts, a retail amount and `wholesale: pending`.
+- [x] Within a few minutes `wholesale.status` becomes `delivered` with an amount, and the admin page shows the margin.
+- [x] Evidence page written with job id, orchestrator, tokens, retail, wholesale.
 
 ## Progress
 
 - 2026-10-19: plan opened.
+- 2026-10-19: stack up, allocation created, four paid jobs (one probe, three replies, one of them by a second
+  account through the browser), both books filled, attribution matched; spend $0.0005. Two defects found and
+  fixed: the engine's `none` cost status was recorded as final, and the chat page lacked a `TooltipProvider`.
+  Evidence: [2026-10-19-first-paid-replies](../../references/evidence/2026-10-19-first-paid-replies.md).
 
 ## Decision log
 
 - 2026-10-19: the RPC URL and payer keystore are the same operator credentials builder-core's dev-stack uses;
   one signer per payer account at a time (D10), so that stack stays down while this one runs.
+- 2026-10-19: the context window comes from discovery metadata first (D14 amended); the paid `/v1/models` probe
+  is the fallback. A wholesale cost is re-read for ten minutes after it is first filled, because the engine
+  corrects it as usage rows arrive; `none` is never written as a final status.

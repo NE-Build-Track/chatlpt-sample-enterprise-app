@@ -46,7 +46,9 @@ class ChatService:
         *,
         params: ChatParams,
         history_turn_limit: int,
+        wholesale_settle_window: timedelta = timedelta(minutes=10),
     ) -> None:
+        self._settle_window = wholesale_settle_window
         self._store = store
         self._ledger = ledger
         self._conversations = conversations
@@ -241,7 +243,8 @@ class ChatService:
         if self._backend is None:
             return 0
         filled = 0
-        for record in await self._ledger.pending_wholesale():
+        since = self._clock.now() - self._settle_window
+        for record in await self._ledger.pending_wholesale(settling_since=since):
             if record.job_id is None:
                 continue
             try:
@@ -254,6 +257,8 @@ class ChatService:
                 continue
             if cost.status in ("pending", "none"):
                 continue  # "none" is the engine's "not yet known" for a paid job; never a zero
+            if cost.status == record.wholesale.status and cost.amount == record.wholesale.amount:
+                continue  # settled and unchanged
             filled_cost = cost.model_copy(
                 update={
                     "updated_at": self._clock.now(),
