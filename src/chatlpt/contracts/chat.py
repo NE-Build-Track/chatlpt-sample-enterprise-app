@@ -106,7 +106,9 @@ class ChatParams(Contract):
     max_output_tokens: int = Field(ge=1)
     include_reasoning: bool = True
     thinking_token_budget: int | None = Field(default=None, ge=1)
-    reasoning_effort: Literal["low", "medium", "high"] | None = None
+    reasoning_effort: Literal["low", "medium"] | None = (
+        None  # the values every runner accepts; None = default
+    )
     continue_final_message: bool = False  # the last turn is a partial assistant answer to continue (D24)
     timeout_s: float = Field(default=300.0, gt=0, le=3600)
 

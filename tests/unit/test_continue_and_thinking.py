@@ -45,7 +45,9 @@ async def test_params_follow_the_conversation_thinking_level(application: Applic
         off.include_reasoning is False and off.thinking_token_budget is None and off.reasoning_effort is None
     )
     high = chat.params_for("high")
-    assert high.include_reasoning and high.reasoning_effort == "high"
+    assert (
+        high.include_reasoning and high.reasoning_effort is None
+    )  # the runner default (xhigh) via the budget
     assert high.thinking_token_budget == application.settings.thinking_budget_high
     assert chat.params_for("medium").thinking_token_budget == application.settings.thinking_budget_medium
 

@@ -14,6 +14,7 @@ import json
 import logging
 from collections.abc import AsyncIterator
 from datetime import datetime, timedelta
+from typing import Literal
 from uuid import UUID
 
 from chatlpt.contracts import (
@@ -45,6 +46,15 @@ from chatlpt.utils import estimate_tokens, new_id
 _LOG = logging.getLogger(__name__)
 ReplyQueue = asyncio.Queue[ReplyEvent | None]
 MIN_OUTPUT_TOKENS = 256
+# reasoning_effort on the wire, probed on all three Qwen hosts on 2026-10-19: "low" and "medium" work
+# everywhere, "high" is rejected everywhere, "xhigh" (the parser's default) works on one host only. High
+# therefore sends no effort, which every host treats as its default, and relies on the larger budget.
+REASONING_EFFORT: dict[ThinkingLevel, Literal["low", "medium"] | None] = {
+    "off": None,
+    "low": "low",
+    "medium": "medium",
+    "high": None,
+}
 ThinkingBudgets = dict[ThinkingLevel, int]
 
 
@@ -99,7 +109,7 @@ class ChatService:
             update={
                 "include_reasoning": True,
                 "thinking_token_budget": self._budgets[thinking],
-                "reasoning_effort": thinking,
+                "reasoning_effort": REASONING_EFFORT[thinking],
             }
         )
 
