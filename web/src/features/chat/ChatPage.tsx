@@ -55,7 +55,8 @@ export function ChatPage() {
         }
       } catch (e) {
         if (!(e instanceof DOMException && e.name === "AbortError")) {
-          setError(e instanceof HttpError ? e.message : "the reply failed");
+          const detail = e instanceof Error ? e.message : String(e);
+          setError(e instanceof HttpError ? e.message : `The reply could not be shown (${detail}). Reload the page; the reply was saved if it completed.`);
         }
       } finally {
         abort.current = null;

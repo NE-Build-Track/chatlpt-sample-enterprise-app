@@ -351,7 +351,14 @@ class ChatService:
                     role="tool",
                     tool_call_id=call.id,
                     content=json.dumps(
-                        {"status": "done", "width": image.width, "height": image.height, "seed": image.seed}
+                        {
+                            "status": "done",
+                            "width": image.width,
+                            "height": image.height,
+                            "seed": image.seed,
+                            "note": "The image is already displayed to the user above your reply. Do not add "
+                            "image links or Markdown images; describe what you drew in a sentence or two.",
+                        }
                     ),
                 )
                 for call, image in zip(image_calls, final.images, strict=False)

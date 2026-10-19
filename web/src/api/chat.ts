@@ -38,6 +38,9 @@ async function* readEvents(url: string, body: string | undefined, signal: AbortS
   }
 }
 
+/** One SSE frame → a reply event, or null for comments, keep-alives, and events this bundle does not know.
+ *  An older bundle must not fail a whole reply because the server learned a new event type; the final
+ *  refetch shows whatever it missed. */
 export function parseFrame(frame: string): ReplyEvent | null {
   const data = frame
     .split("\n")
@@ -45,5 +48,16 @@ export function parseFrame(frame: string): ReplyEvent | null {
     .map((line) => line.slice(5).trimStart())
     .join("\n");
   if (!data) return null;
-  return ReplyEvent.parse(JSON.parse(data));
+  let raw: unknown;
+  try {
+    raw = JSON.parse(data);
+  } catch {
+    return null;
+  }
+  const parsed = ReplyEvent.safeParse(raw);
+  if (!parsed.success) {
+    console.warn("ignoring a reply event this bundle does not understand", parsed.error.issues[0]?.message, raw);
+    return null;
+  }
+  return parsed.data;
 }

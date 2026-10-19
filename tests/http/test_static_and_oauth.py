@@ -64,7 +64,8 @@ async def test_static_bundle_is_served_with_spa_fallback(tmp_path: Path) -> None
     api = create_app(make_app(str(tmp_path)), manage_lifecycle=False)
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=api), base_url="http://t") as client:
         assert (await client.get("/")).text == "<html>app</html>"
-        assert (await client.get("/c/123")).text == "<html>app</html>"
+        shell = await client.get("/c/123")
+        assert shell.text == "<html>app</html>" and shell.headers["cache-control"] == "no-cache"
         assert (await client.get("/favicon.svg")).text == "<svg/>"
         assert (await client.get("/assets/a.js")).text == "js"
         assert (await client.get("/../etc/passwd")).text == "<html>app</html>"

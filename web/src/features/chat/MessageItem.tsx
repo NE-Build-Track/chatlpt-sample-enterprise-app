@@ -44,7 +44,7 @@ export function MessageItem({
       {message.reasoning && <Thinking text={message.reasoning} streaming={streaming && !message.content} />}
       <div className={cn("prose prose-sm max-w-none dark:prose-invert prose-pre:bg-muted prose-pre:text-foreground", streaming && "animate-pulse-caret")}>
         {message.content ? (
-          <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+          <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]} components={{ img: SafeImage }}>
             {message.content}
           </Markdown>
         ) : streaming ? (
@@ -130,6 +130,13 @@ function ImageCard({ image }: { image: GeneratedImage }) {
       </figcaption>
     </figure>
   );
+}
+
+/** Only images the app serves are rendered; a model-invented URL becomes its alt text instead of a broken picture. */
+function SafeImage({ src, alt }: { src?: string | Blob; alt?: string }) {
+  const url = typeof src === "string" ? src : "";
+  if (url.startsWith("/api/images/")) return <img src={url} alt={alt ?? ""} className="rounded-lg" />;
+  return alt ? <em>{alt}</em> : null;
 }
 
 function Thinking({ text, streaming }: { text: string; streaming: boolean }) {

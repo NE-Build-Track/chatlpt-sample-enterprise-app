@@ -15,7 +15,9 @@ FastAPI as static files with SPA fallback.
 - Streaming: `EventSource`-style consumption through `fetch` + `ReadableStream`, so the request can
   carry the CSRF header and be aborted by the stop button.
 - State: React Query for server state; no global store.
-- Tests: Vitest + Testing Library for components; Playwright smoke in `web/e2e` (plan-04).
+- Tests: Vitest for modules; `web/e2e/draw-smoke.mjs` drives the deployed app in headless Chromium with a saved
+  session (`pnpm e2e:draw <base-url> <storage-state.json> "<prompt>"`), prints the page text, rendered images and
+  console errors, and spends one image. Playwright is a dev dependency; `pnpm dlx playwright install chromium` once.
 
 ## Look and feel
 

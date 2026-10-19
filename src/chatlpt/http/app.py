@@ -78,4 +78,5 @@ def _mount_static(api: FastAPI, static_dir: Path) -> None:
         candidate = (static_dir / path).resolve()
         if path and candidate.is_file() and static_dir.resolve() in candidate.parents:
             return FileResponse(candidate)
-        return FileResponse(index)
+        # The shell is never cached: a reload always names the current hashed assets.
+        return FileResponse(index, headers={"Cache-Control": "no-cache"})
