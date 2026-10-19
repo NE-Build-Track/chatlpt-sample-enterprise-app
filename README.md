@@ -10,7 +10,7 @@
 [![Docker Compose](https://img.shields.io/badge/deploy-Docker%20Compose-2496ED?logo=docker&logoColor=white)](deploy/compose.yaml)
 [![livepeer-builder streaming branch](https://img.shields.io/badge/livepeer--builder-m3%20stream--support%20(embedded)-00EB88)](https://github.com/NE-Build-Track/livepeer-builder-core)
 [![Model](https://img.shields.io/badge/model-Qwen3.8--27B%20on%20Livepeer-FF6A00)](docs/references/qwen-runner.md)
-[![Status](https://img.shields.io/badge/status-alpha%20%C2%B7%20streaming%20live-orange)](docs/PLANS.md)
+[![Status](https://img.shields.io/badge/status-alpha%20%C2%B7%20streaming%20%2B%20images%20live-orange)](docs/PLANS.md)
 [![Agent-first](https://img.shields.io/badge/built-agent--first-8A2BE2)](docs/references/harness-engineering.md)
 
 A ChatGPT-style chat application that runs its model on the **Livepeer network** through the
@@ -22,7 +22,7 @@ tokens would cost at the model vendor's list price (**retail**).
 It is a **sample enterprise application**: a reference for embedding the engine in a Python backend,
 and a reference for building such an app agent-first, where the repository is the system of record.
 
-> Status: **alpha; paid, streamed replies work end to end**. See [docs/PLANS.md](docs/PLANS.md) for the order of work.
+> Status: **alpha; paid, streamed replies and model-driven images work end to end**. See [docs/PLANS.md](docs/PLANS.md) for the order of work.
 
 ## Contents
 
@@ -57,6 +57,10 @@ and plans checked in as artifacts.
 - Chat with `Qwen3.8-27B` (`blueclaw/chat/qwen3.8-27b`), served by vLLM on approved Livepeer
   orchestrators. Markdown replies, code blocks, a collapsible **Thinking** block, a stop button, a
   per-conversation thinking level, and **Continue generating** when a reply hits the output limit.
+- **Images, the way ChatGPT does them:** the assistant decides when to draw. It calls a
+  `generate_image` tool, the app runs FLUX.1 [schnell] (`comfystream/fal-flux-schnell`) through the
+  engine, keeps the file, and the model captions the result. Each image shows its retail price (fal's
+  list price per megapixel) and the network cost.
 - Under each reply: prompt, completion and reasoning tokens; **retail** cost from Alibaba Cloud's
   Qwen list prices; **wholesale** cost from the engine once Batteries reports it.
 - Conversation sidebar, rename and delete, per-conversation and per-month totals.
@@ -183,6 +187,7 @@ Everything is an environment variable; `deploy/.env.example` lists each with its
 | `CHATLPT_GOOGLE_CLIENT_ID/SECRET`, `CHATLPT_GITHUB_CLIENT_ID/SECRET` | Enable each sign-in button |
 | `CHATLPT_SYSTEM_PROMPT`, `CHATLPT_TEMPERATURE`, `CHATLPT_MAX_OUTPUT_TOKENS` | Model defaults; the output limit covers answer plus thinking |
 | `CHATLPT_DEFAULT_THINKING`, `CHATLPT_THINKING_BUDGET_LOW/MEDIUM/HIGH` | The per-conversation thinking level and its chain-of-thought caps |
+| `CHATLPT_TOOLS_ENABLED`, `CHATLPT_IMAGE_APP`, `CHATLPT_IMAGES_DIR`, `CHATLPT_IMAGE_RETENTION_DAYS`, `CHATLPT_IMAGE_PRICING_FILE` | Model-driven images: the tool, the runner app, where files live, how long, and fal's price table |
 | `CHATLPT_CONTEXT_WINDOW_OVERRIDE` | Last-resort override of the derived context window |
 | `CHATLPT_PRICING_FILE` | The retail price table (`config/pricing/qwen3.8-27b.json`) |
 | `LPB_*` | The embedded engine: signer, Batteries, shared key, database. See [payment-stack](docs/references/payment-stack.md) |

@@ -41,7 +41,7 @@ def source(
     return FilteredSignerDiscovery(
         signer_url="http://signer",
         discovery_url=None,
-        app=APP,
+        apps=frozenset({APP}),
         hosts=hosts,
         clock=FixedClock(),
         discover=discover,

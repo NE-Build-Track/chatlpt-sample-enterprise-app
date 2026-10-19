@@ -30,49 +30,49 @@ class FilteredSignerDiscovery:
         *,
         signer_url: str | None,
         discovery_url: str | None,
-        app: str,
+        apps: frozenset[str],
         hosts: frozenset[str],
         clock: Clock,
         discover: Discover = discover_runners,
     ) -> None:
         self._signer_url = signer_url
         self._discovery_url = discovery_url
-        self._app = app
+        self._apps = apps
         self._hosts = hosts
         self._clock = clock
         self._discover = discover
-        self._model: ModelInfo | None = None
+        self._models: dict[str, ModelInfo] = {}
 
     async def fetch(self) -> tuple[Runner, ...]:
         entries = await self._discover(
-            signer_url=self._signer_url, discovery_url=self._discovery_url, app=[self._app]
+            signer_url=self._signer_url, discovery_url=self._discovery_url, app=sorted(self._apps)
         )
         kept: list[dict[str, Any]] = []
         dropped = 0
-        advertised: list[ModelInfo] = []
+        advertised: dict[str, list[ModelInfo]] = {}
         for entry in entries:
             if not isinstance(entry, dict):
                 continue
             raw_runners = entry.get("runners") or ()
-            runners = [r for r in raw_runners if isinstance(r, dict) and r.get("app") == self._app]
+            runners = [r for r in raw_runners if isinstance(r, dict) and r.get("app") in self._apps]
             if not runners or not self._host_ok(entry.get("address")):
                 dropped += len(runners) if runners else 0
                 continue
             kept.append({**entry, "runners": runners})
             for runner in runners:
-                info = self._parse(runner.get("metadata"))
+                info = self._parse(str(runner.get("app")), runner.get("metadata"))
                 if info is not None:
-                    advertised.append(info)
-        if advertised:
+                    advertised.setdefault(info.app, []).append(info)
+        for app, infos in advertised.items():
             # Orchestrators advertise different limits for the same app (19 October: 40960 vs 131072). The
             # engine may pick any of them, so the smallest window is the one every reply fits in.
-            self._model = min(advertised, key=lambda m: m.max_model_len)
+            self._models[app] = min(infos, key=lambda m: m.max_model_len)
         if dropped:
             _LOG.debug("discovery filtered", extra={"event": "discovery.filtered", "dropped": dropped})
         return tuple(runners_from_entries(kept))
 
     def model_from_discovery(self, app: str) -> ModelInfo | None:
-        return self._model if app == self._app else None
+        return self._models.get(app)
 
     def _host_ok(self, url: object) -> bool:
         if not self._hosts:
@@ -80,7 +80,7 @@ class FilteredSignerDiscovery:
         host = urlparse(url).hostname if isinstance(url, str) else None
         return host is not None and host.lower() in self._hosts
 
-    def _parse(self, metadata: object) -> ModelInfo | None:
+    def _parse(self, app: str, metadata: object) -> ModelInfo | None:
         if not isinstance(metadata, str) or not metadata:
             return None
         try:
@@ -94,7 +94,7 @@ class FilteredSignerDiscovery:
             return None
         model_id = parsed.get("model_id")
         return ModelInfo(
-            app=self._app,
+            app=app,
             model_id=str(model_id) if model_id else "unknown",
             max_model_len=max_context,
             observed_at=self._clock.now(),

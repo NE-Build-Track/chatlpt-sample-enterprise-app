@@ -1,13 +1,16 @@
-"""A reply, end to end (ARCHITECTURE.md#a-reply-end-to-end), and "continue generating" (D24).
+"""A reply, end to end (ARCHITECTURE.md#a-reply-end-to-end), "continue generating" (D24) and images (D25).
 
 Builds the turns within the derived context window, opens the backend stream, forwards events to the
 caller while accumulating the reply, and on completion writes both books. The consumption runs in
 its own task, so a browser that leaves mid-reply does not lose a paid answer. A continuation is a
 new assistant message that extends a reply the runner cut off at the output limit: the partial
-answer goes back as the final turn and the model continues it.
+answer goes back as the final turn and the model continues it. When the model calls the
+``generate_image`` tool, the app runs the image, feeds the result back, and the model captions it:
+two assistant messages, one of them a ``tool_call`` message carrying the image.
 """
 
 import asyncio
+import json
 import logging
 from collections.abc import AsyncIterator, Sequence
 from datetime import datetime, timedelta
@@ -17,11 +20,14 @@ from chatlpt.contracts import (
     ChatParams,
     ChatTurn,
     Conversation,
+    GeneratedImage,
     Message,
     NewMessage,
     ReplyEvent,
     ThinkingLevel,
     TokenUsage,
+    ToolCall,
+    ToolSpec,
     UsageRecord,
     User,
     WholesaleCost,
@@ -31,11 +37,27 @@ from chatlpt.protocols import ChatBackend, Clock, ConversationStore, UsageLedger
 from chatlpt.services.billing import BillingService
 from chatlpt.services.context import TURN_OVERHEAD_TOKENS, ContextService
 from chatlpt.services.conversations import NEW_TITLE, ConversationService, title_from
+from chatlpt.services.images import SIZES, ImageService
 from chatlpt.utils import estimate_tokens, new_id
 
 _LOG = logging.getLogger(__name__)
 ReplyQueue = asyncio.Queue[ReplyEvent | None]
 MIN_OUTPUT_TOKENS = 256
+GENERATE_IMAGE = ToolSpec(
+    name="generate_image",
+    description=(
+        "Generate an image from a text prompt. Call this whenever the user asks you to draw, paint, render, "
+        "illustrate, sketch or create a picture or photo. Write a vivid, specific prompt."
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "prompt": {"type": "string", "description": "A detailed description of the image to generate"},
+            "image_size": {"type": "string", "enum": sorted(SIZES), "description": "Aspect ratio and size"},
+        },
+        "required": ["prompt"],
+    },
+)
 ThinkingBudgets = dict[ThinkingLevel, int]
 
 
@@ -43,12 +65,21 @@ def turns_from(messages: Sequence[Message]) -> list[ChatTurn]:
     """History as the model should see it: continuation segments fold into the message they extend."""
     turns: list[ChatTurn] = []
     for message in messages:
-        if message.role == "system" or not message.content:
+        if message.role in ("system", "tool"):
             continue
-        if message.continues_message_id is not None and turns and turns[-1].role == "assistant":
-            turns[-1] = ChatTurn(role="assistant", content=turns[-1].content + message.content)
+        content = message.content
+        if message.kind == "tool_call":
+            prompts = [i.prompt for i in message.images] or [
+                str(c.arguments.get("prompt", "")) for c in message.tool_calls
+            ]
+            content = "\n".join(f"[Generated an image from the prompt: {p}]" for p in prompts if p)
+        if not content:
             continue
-        turns.append(ChatTurn(role=message.role, content=message.content))
+        if message.role == "assistant" and turns and turns[-1].role == "assistant":
+            glue = "" if message.continues_message_id is not None else "\n"
+            turns[-1] = ChatTurn(role="assistant", content=turns[-1].content + glue + content)
+            continue
+        turns.append(ChatTurn(role=message.role, content=content))
     return turns
 
 
@@ -72,6 +103,7 @@ class ChatService:
         billing: BillingService,
         clock: Clock,
         *,
+        images: ImageService,
         params: ChatParams,
         thinking_budgets: ThinkingBudgets,
         history_turn_limit: int,
@@ -84,6 +116,7 @@ class ChatService:
         self._context = context
         self._billing = billing
         self._clock = clock
+        self._images = images
         self._params = params
         self._budgets = thinking_budgets
         self._history_limit = history_turn_limit
@@ -129,13 +162,9 @@ class ChatService:
             await self._store.rename_conversation(conversation.id, title_from(request.content), now)
         placeholder = self._placeholder(conversation, after=now)
         turns = [*turns_from(history), ChatTurn(role="user", content=request.content)]
+        params = self.params_for(conversation.thinking)
         async for event in self._produce(
-            user,
-            backend,
-            placeholder,
-            turns,
-            self.params_for(conversation.thinking),
-            user_message=user_message,
+            user, backend, placeholder, turns, params, user_message=user_message, conversation=conversation
         ):
             yield event
 
@@ -163,7 +192,16 @@ class ChatService:
         params = self.params_for(conversation.thinking).model_copy(
             update={"continue_final_message": True, "include_reasoning": False, "reasoning_effort": None}
         )
-        async for event in self._produce(user, backend, placeholder, turns, params, user_message=None):
+        async for event in self._produce(
+            user,
+            backend,
+            placeholder,
+            turns,
+            params,
+            user_message=None,
+            conversation=conversation,
+            allow_tools=False,
+        ):
             yield event
 
     # -- the pipeline -------------------------------------------------------------------------------
@@ -199,6 +237,8 @@ class ChatService:
         params: ChatParams,
         *,
         user_message: Message | None,
+        conversation: Conversation | None = None,
+        allow_tools: bool = True,
     ) -> AsyncIterator[ReplyEvent]:
         window = await self._context.window(user.id, backend.app)
         recent = turns[-self._history_limit :]
@@ -210,16 +250,23 @@ class ChatService:
         prompt_estimate = sum(estimate_tokens(t.content) + TURN_OVERHEAD_TOKENS for t in fitted)
         effective_max = max(MIN_OUTPUT_TOKENS, min(params.max_output_tokens, window - prompt_estimate - 64))
         params = params.model_copy(update={"max_output_tokens": effective_max})
+        tools: list[ToolSpec] = [GENERATE_IMAGE] if allow_tools and self._images.available else []
+        if tools and not params.include_reasoning:
+            # the tool decision was unreliable with thinking off (evidence 2026-10-19): think a little
+            params = self.params_for("low").model_copy(update={"max_output_tokens": effective_max})
         placeholder = placeholder.model_copy(update={"dropped_turns": dropped or None})
         await self._store.add_message(placeholder)
         yield ReplyEvent(type="start", user_message=user_message, message=placeholder, dropped_turns=dropped)
 
         content: list[str] = []
         reasoning: list[str] = []
+        calls: list[ToolCall] = []
         usage: TokenUsage | None = None
         finish_reason: str | None = None
         try:
-            stream = await backend.open_reply(user.id, fitted, params, operation_ref=str(placeholder.id))
+            stream = await backend.open_reply(
+                user.id, fitted, params, operation_ref=str(placeholder.id), tools=tools
+            )
             async for chunk in stream:
                 if chunk.kind == "content" and chunk.text:
                     content.append(chunk.text)
@@ -227,6 +274,8 @@ class ChatService:
                 elif chunk.kind == "reasoning" and chunk.text:
                     reasoning.append(chunk.text)
                     yield ReplyEvent(type="reasoning", text=chunk.text)
+                elif chunk.kind == "tool_call" and chunk.tool_call is not None:
+                    calls.append(chunk.tool_call)
                 elif chunk.kind == "usage" and chunk.usage is not None:
                     usage = chunk.usage
                 elif chunk.kind == "done":
@@ -257,6 +306,32 @@ class ChatService:
             )
             raise
 
+        image_calls = [c for c in calls if c.name == GENERATE_IMAGE.name and c.arguments.get("prompt")]
+        if image_calls and conversation is not None:
+            placeholder = placeholder.model_copy(
+                update={"kind": "tool_call", "tool_calls": tuple(image_calls)}
+            )
+            await self._store.update_message(placeholder)
+            yield ReplyEvent(type="tool_call", message=placeholder)
+            images: list[GeneratedImage] = []
+            try:
+                for call in image_calls[:2]:  # at most two pictures per turn
+                    image = await self._images.generate(
+                        user,
+                        conversation,
+                        placeholder.id,
+                        str(call.arguments["prompt"]),
+                        str(call.arguments.get("image_size") or "") or None,
+                    )
+                    images.append(image)
+                    yield ReplyEvent(type="image", image=image)
+            except AppError as error:
+                failed = placeholder.model_copy(
+                    update={"state": "failed", "error": str(error), "images": tuple(images)}
+                )
+                await self._store.update_message(failed)
+                raise
+            placeholder = placeholder.model_copy(update={"images": tuple(images)})
         final = await self._finish(
             user,
             backend,
@@ -269,6 +344,35 @@ class ChatService:
             finish_reason,
         )
         yield ReplyEvent(type="done", message=final)
+        if image_calls and conversation is not None:
+            # the model captions what it drew: tool results back, no tools this time
+            results = [
+                ChatTurn(
+                    role="tool",
+                    tool_call_id=call.id,
+                    content=json.dumps(
+                        {"status": "done", "width": image.width, "height": image.height, "seed": image.seed}
+                    ),
+                )
+                for call, image in zip(image_calls, final.images, strict=False)
+            ]
+            follow_up = [
+                *turns,
+                ChatTurn(role="assistant", content="", tool_calls=tuple(image_calls)),
+                *results,
+            ]
+            caption = self._placeholder(conversation, after=final.created_at)
+            async for event in self._produce(
+                user,
+                backend,
+                caption,
+                follow_up,
+                params,
+                user_message=None,
+                conversation=conversation,
+                allow_tools=False,
+            ):
+                yield event
 
     def _detach(self, events: AsyncIterator[ReplyEvent]) -> ReplyQueue:
         queue: ReplyQueue = asyncio.Queue()

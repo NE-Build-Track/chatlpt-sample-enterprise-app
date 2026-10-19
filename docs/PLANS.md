@@ -17,5 +17,6 @@ acceptance checks pass, in the same commit. Known shortcuts go to
 | plan-04-chat-and-billing | Conversations, replies, context window, two books, admin page | delivered with plans 01–02 and D23–D24 (continue generating, thinking levels, dropped-turn notes, 2026-10-19); a browser test suite is the remaining item |
 | plan-05-engine-streaming (builder-core) | `tasks/m3/mz/stream-support`: contract, transport, REST, tests | implemented and shown live 2026-10-19 (builder-core commit `973ac57`), awaiting review |
 | [plan-06-streaming-adapter](exec-plans/completed/plan-06-streaming-adapter.md) | Move the pin, swap `adapters/engine.py`, verify deltas end to end | completed 2026-10-19 |
+| [plan-07-model-driven-images](exec-plans/completed/plan-07-model-driven-images.md) | The assistant draws through a tool call; images stored, priced and captioned | completed 2026-10-19 |
 
 Small changes do not need a plan; they need a test and a sentence in the commit.

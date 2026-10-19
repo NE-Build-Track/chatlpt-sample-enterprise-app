@@ -30,12 +30,38 @@ export const WholesaleCost = z.object({
 });
 export type WholesaleCost = z.infer<typeof WholesaleCost>;
 
+export const ToolCall = z.object({ id: z.string(), name: z.string(), arguments: z.record(z.string(), z.unknown()) });
+export type ToolCall = z.infer<typeof ToolCall>;
+
+export const GeneratedImage = z.object({
+  id: z.string(),
+  message_id: z.string(),
+  conversation_id: z.string(),
+  prompt: z.string(),
+  image_size: z.string(),
+  width: z.number(),
+  height: z.number(),
+  seed: z.number().nullable().optional(),
+  content_type: z.string(),
+  size_bytes: z.number(),
+  job_id: z.string().nullable().optional(),
+  orchestrator_url: z.string().nullable().optional(),
+  retail: Money.nullable().optional(),
+  wholesale: WholesaleCost.nullable().optional(),
+  expired: z.boolean().default(false),
+  created_at: z.string(),
+});
+export type GeneratedImage = z.infer<typeof GeneratedImage>;
+
 export const Message = z.object({
   id: z.string(),
   conversation_id: z.string(),
-  role: z.enum(["system", "user", "assistant"]),
+  role: z.enum(["system", "user", "assistant", "tool"]),
+  kind: z.enum(["text", "tool_call"]).default("text"),
   content: z.string(),
   reasoning: z.string().nullable().optional(),
+  tool_calls: z.array(ToolCall).default([]),
+  images: z.array(GeneratedImage).default([]),
   state: z.enum(["streaming", "complete", "failed", "uncertain"]).default("complete"),
   job_id: z.string().nullable().optional(),
   orchestrator_url: z.string().nullable().optional(),
@@ -74,6 +100,7 @@ export const UsageTotals = z.object({
   retail: Money,
   wholesale: Money,
   wholesale_pending: z.number(),
+  images: z.number().default(0),
 });
 export type UsageTotals = z.infer<typeof UsageTotals>;
 
@@ -97,6 +124,8 @@ export const ModelOut = z.object({
   app: z.string(),
   chat_available: z.boolean(),
   reason: z.string().nullable(),
+  images_available: z.boolean().default(false),
+  image_app: z.string().nullable().optional(),
   model: ModelInfo.nullable(),
   prices: PriceTable,
 });
@@ -106,8 +135,9 @@ export const Providers = z.object({ providers: z.array(z.string()), allow_signup
 export type Providers = z.infer<typeof Providers>;
 
 export const ReplyEvent = z.object({
-  type: z.enum(["start", "reasoning", "content", "usage", "done", "error"]),
+  type: z.enum(["start", "reasoning", "content", "tool_call", "image", "usage", "done", "error"]),
   user_message: Message.nullable().optional(),
+  image: GeneratedImage.nullable().optional(),
   dropped_turns: z.number().default(0),
   message: Message.nullable().optional(),
   text: z.string().default(""),

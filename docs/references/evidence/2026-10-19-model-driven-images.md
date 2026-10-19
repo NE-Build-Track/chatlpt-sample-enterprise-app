@@ -31,3 +31,22 @@ with the engine from branch `tasks/m3/mz/stream-support` at `973ac57`.
   keeps its own ledger row.
 - Retail for an image comes from fal's list price per megapixel ([fal-pricing](../fal-pricing.md));
   it is nearly equal to the network price for this app.
+
+## Addendum: through the deployed app
+
+With plan 07 deployed (schema `0004`, `ai1.eliteencoder.net` approved), one request through
+`POST /api/conversations/{id}/messages`: "Draw me a cozy mountain cabin at dusk with warm light in the
+windows, in the style of a vintage travel poster."
+
+| Step | What the app did |
+| --- | --- |
+| The model's decision | a `tool_call` event with a 130-word prompt it wrote itself and `image_size: portrait_4_3`; 426 prompt / 297 completion tokens, 94 of them reasoning |
+| The image | `comfystream/fal-flux-schnell` on ai1.eliteencoder.net: 768×1024 JPEG, 704 KB, written to `/data/images/37d2e405….jpg`, served back by `GET /api/images/{id}` to the owner only |
+| The caption | a second model call with the tool result: 324 / 193 tokens, Markdown describing the scene |
+| Events seen by the browser | 2 `start`, 74 `reasoning`, 1 `tool_call`, 1 `image`, 83 `content`, 2 `done` |
+| Ledger | three rows: chat $0.001104 retail / $0.000111 network, image **$0.003 retail / $0.003000 network**, chat $0.000741 / $0.000111. All three `delivered` within a minute |
+| Conversation totals | retail $0.004845, network $0.003222, nothing pending |
+
+![The conversation](2026-10-19-draw.png)
+
+![The image, reduced](2026-10-19-cabin.jpg)

@@ -172,6 +172,132 @@
         "title": "DisabledBody",
         "type": "object"
       },
+      "GeneratedImage": {
+        "additionalProperties": false,
+        "description": "An image the assistant generated through a tool call; the bytes live on the volume (D25).",
+        "properties": {
+          "content_type": {
+            "title": "Content Type",
+            "type": "string"
+          },
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expired": {
+            "default": false,
+            "title": "Expired",
+            "type": "boolean"
+          },
+          "height": {
+            "title": "Height",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "image_size": {
+            "title": "Image Size",
+            "type": "string"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "message_id": {
+            "format": "uuid",
+            "title": "Message Id",
+            "type": "string"
+          },
+          "orchestrator_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orchestrator Url"
+          },
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          },
+          "retail": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "wholesale": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WholesaleCost"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "width": {
+            "title": "Width",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "message_id",
+          "conversation_id",
+          "prompt",
+          "image_size",
+          "width",
+          "height",
+          "seed",
+          "content_type",
+          "size_bytes",
+          "job_id",
+          "orchestrator_url",
+          "created_at"
+        ],
+        "title": "GeneratedImage",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -274,6 +400,14 @@
             "title": "Id",
             "type": "string"
           },
+          "images": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/GeneratedImage"
+            },
+            "title": "Images",
+            "type": "array"
+          },
           "job_id": {
             "anyOf": [
               {
@@ -285,6 +419,15 @@
               }
             ],
             "title": "Job Id"
+          },
+          "kind": {
+            "default": "text",
+            "enum": [
+              "text",
+              "tool_call"
+            ],
+            "title": "Kind",
+            "type": "string"
           },
           "orchestrator_url": {
             "anyOf": [
@@ -322,7 +465,8 @@
             "enum": [
               "system",
               "user",
-              "assistant"
+              "assistant",
+              "tool"
             ],
             "title": "Role",
             "type": "string"
@@ -337,6 +481,14 @@
             ],
             "title": "State",
             "type": "string"
+          },
+          "tool_calls": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ToolCall"
+            },
+            "title": "Tool Calls",
+            "type": "array"
           },
           "usage": {
             "anyOf": [
@@ -409,6 +561,22 @@
           },
           "chat_available": {
             "title": "Chat Available",
+            "type": "boolean"
+          },
+          "image_app": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image App"
+          },
+          "images_available": {
+            "default": false,
+            "title": "Images Available",
             "type": "boolean"
           },
           "model": {
@@ -641,6 +809,32 @@
         "title": "TokenUsage",
         "type": "object"
       },
+      "ToolCall": {
+        "additionalProperties": false,
+        "description": "One function call the model made (OpenAI shape, arguments already parsed).",
+        "properties": {
+          "arguments": {
+            "additionalProperties": true,
+            "title": "Arguments",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "arguments"
+        ],
+        "title": "ToolCall",
+        "type": "object"
+      },
       "UpdateConversation": {
         "additionalProperties": false,
         "description": "PATCH body: either field may be omitted.",
@@ -691,6 +885,11 @@
             "format": "date-time",
             "title": "End",
             "type": "string"
+          },
+          "images": {
+            "default": 0,
+            "title": "Images",
+            "type": "integer"
           },
           "prompt_tokens": {
             "title": "Prompt Tokens",

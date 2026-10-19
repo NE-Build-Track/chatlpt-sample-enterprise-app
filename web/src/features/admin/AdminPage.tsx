@@ -30,6 +30,7 @@ export function AdminPage() {
           <TableRow>
             <TableHead>User</TableHead>
             <TableHead className="text-right">Replies</TableHead>
+            <TableHead className="text-right">Images</TableHead>
             <TableHead className="text-right">Tokens in / out</TableHead>
             <TableHead className="text-right">Retail</TableHead>
             <TableHead className="text-right">Network</TableHead>
@@ -51,6 +52,7 @@ export function AdminPage() {
                   </div>
                 </TableCell>
                 <TableCell className="text-right">{totals?.replies ?? 0}</TableCell>
+                <TableCell className="text-right">{totals?.images ?? 0}</TableCell>
                 <TableCell className="text-right">{formatTokens(totals?.prompt_tokens ?? 0)} / {formatTokens(totals?.completion_tokens ?? 0)}</TableCell>
                 <TableCell className="text-right">{formatMoney(totals?.retail)}</TableCell>
                 <TableCell className="text-right">
@@ -71,6 +73,7 @@ export function AdminPage() {
           <TableRow className="font-medium">
             <TableCell>Total</TableCell>
             <TableCell className="text-right">{sum((t) => t.replies)}</TableCell>
+            <TableCell className="text-right">{sum((t) => t.images)}</TableCell>
             <TableCell className="text-right">{formatTokens(sum((t) => t.prompt_tokens))} / {formatTokens(sum((t) => t.completion_tokens))}</TableCell>
             <TableCell className="text-right">{formatMoney({ amount: sum((t) => Number(t.retail.amount)).toFixed(10), currency: "USD" })}</TableCell>
             <TableCell className="text-right">{formatMoney({ amount: sum((t) => Number(t.wholesale.amount)).toFixed(10), currency: "USD" })}</TableCell>

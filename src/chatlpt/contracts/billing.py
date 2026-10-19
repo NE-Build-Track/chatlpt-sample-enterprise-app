@@ -58,10 +58,32 @@ class WholesaleCost(Contract):
         return cls(status="pending")
 
 
+LedgerKind = Literal["chat", "image"]
+
+
+class ImagePriceTable(Contract):
+    """A vendor's list price per megapixel for an image model, with provenance (D25)."""
+
+    model: str
+    vendor: str
+    region: str
+    currency: Currency
+    unit: Literal["megapixel"]
+    price_per_unit: Decimal
+    rounding: str
+    source_url: str
+    observed_at: datetime
+
+
 class UsageRecord(Contract):
-    """One assistant reply's entry in the ledger: both books, one job id."""
+    """One paid job's entry in the ledger: both books, one job id.
+
+    ``message_id`` is the record key: the assistant message for a chat job, the image id for an
+    image job (``kind``).
+    """
 
     message_id: UUID
+    kind: LedgerKind = "chat"
     user_id: UUID
     conversation_id: UUID
     job_id: UUID | None
@@ -84,3 +106,4 @@ class UsageTotals(Contract):
     retail: Money
     wholesale: Money
     wholesale_pending: int
+    images: int = 0

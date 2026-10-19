@@ -11,7 +11,7 @@ _LOG = logging.getLogger(__name__)
 
 
 async def build_engine(
-    *, app: str, approved_hosts: frozenset[str], clock: Clock
+    *, apps: frozenset[str], approved_hosts: frozenset[str], clock: Clock
 ) -> tuple[BuilderEngine, FilteredSignerDiscovery] | None:
     """None when ``LPB_SIGNER_URL`` is unset: the app runs degraded (chat disabled) rather than failing."""
     settings = EngineSettings.from_env()
@@ -20,7 +20,7 @@ async def build_engine(
     source = FilteredSignerDiscovery(
         signer_url=settings.signer_url,
         discovery_url=settings.discovery_url,
-        app=app,
+        apps=apps,
         hosts=approved_hosts,
         clock=clock,
     )
@@ -30,7 +30,7 @@ async def build_engine(
         extra={
             "event": "engine.built",
             "allocation_mode": settings.allocation_mode,
-            "app": app,
+            "apps": sorted(apps),
             "hosts": sorted(approved_hosts),
         },
     )

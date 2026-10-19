@@ -26,5 +26,6 @@ def test_approved_hosts_are_parsed_from_urls() -> None:
             "us-central-metrics.speedybird.xyz",
             "orch-eu-central.open-pool.com",
             "hky.eliteencoder.net",
+            "ai1.eliteencoder.net",
         }
     )

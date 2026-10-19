@@ -28,8 +28,18 @@ from livepeer_builder import (
 from livepeer_builder.errors import EngineError
 from livepeer_builder.errors import NotFound as EngineNotFound
 
+from chatlpt.adapters.openai_wire import ToolCallAssembler, parse_tool_calls, wire_turn
 from chatlpt.adapters.sse import SseDecoder
-from chatlpt.contracts import ChatParams, ChatTurn, ModelInfo, Money, ReplyChunk, TokenUsage, WholesaleCost
+from chatlpt.contracts import (
+    ChatParams,
+    ChatTurn,
+    ModelInfo,
+    Money,
+    ReplyChunk,
+    TokenUsage,
+    ToolSpec,
+    WholesaleCost,
+)
 from chatlpt.errors import ChatUnavailable, Conflict, NotFound, ReplyFailed
 from chatlpt.protocols import Clock
 
@@ -99,10 +109,16 @@ class BufferedEngineChat:
         return True, None
 
     def _request(
-        self, turns: Sequence[ChatTurn], params: ChatParams, operation_ref: str, *, stream: bool
+        self,
+        turns: Sequence[ChatTurn],
+        params: ChatParams,
+        operation_ref: str,
+        *,
+        stream: bool,
+        tools: Sequence[ToolSpec] = (),
     ) -> JobRequest:
         payload: dict[str, Any] = {
-            "messages": [{"role": t.role, "content": t.content} for t in turns],
+            "messages": [wire_turn(t) for t in turns],
             "max_tokens": params.max_output_tokens,
             "temperature": float(params.temperature),  # the wire format; never money
             "stream": stream,
@@ -110,6 +126,15 @@ class BufferedEngineChat:
         }
         if stream:
             payload["stream_options"] = {"include_usage": True}
+        if tools:
+            payload["tools"] = [
+                {
+                    "type": "function",
+                    "function": {"name": s.name, "description": s.description, "parameters": s.parameters},
+                }
+                for s in tools
+            ]
+            payload["tool_choice"] = "auto"
         if params.include_reasoning and params.thinking_token_budget is not None:
             payload["thinking_token_budget"] = params.thinking_token_budget
         if params.include_reasoning and params.reasoning_effort is not None:
@@ -130,9 +155,14 @@ class BufferedEngineChat:
         )
 
     async def open_reply(
-        self, user_id: UUID, turns: Sequence[ChatTurn], params: ChatParams, operation_ref: str
+        self,
+        user_id: UUID,
+        turns: Sequence[ChatTurn],
+        params: ChatParams,
+        operation_ref: str,
+        tools: Sequence[ToolSpec] = (),
     ) -> BufferedReply:
-        request = self._request(turns, params, operation_ref, stream=False)
+        request = self._request(turns, params, operation_ref, stream=False, tools=tools)
         result = await self._run(user_id, request)
         data = result.data if isinstance(result.data, dict) else {}
         attempt = result.job.attempts[-1] if result.job.attempts else None
@@ -221,6 +251,7 @@ class StreamingReply:
                 yield chunk
             return
         decoder = SseDecoder()
+        calls = ToolCallAssembler()
         finish_reason: str | None = None
         usage: TokenUsage | None = None
         try:
@@ -228,6 +259,7 @@ class StreamingReply:
                 for event in decoder.feed(raw):
                     for chunk in _delta_chunks(event):
                         yield chunk
+                    calls.feed(event)
                     finish_reason = _finish_reason(event) or finish_reason
                     usage = parse_usage(event.get("usage")) or usage
         except JobFailed as exc:
@@ -235,8 +267,11 @@ class StreamingReply:
         for event in decoder.flush():
             for chunk in _delta_chunks(event):
                 yield chunk
+            calls.feed(event)
             finish_reason = _finish_reason(event) or finish_reason
             usage = parse_usage(event.get("usage")) or usage
+        for call in calls.result():
+            yield ReplyChunk(kind="tool_call", tool_call=call)
         if usage is not None:
             yield ReplyChunk(kind="usage", usage=usage)
         yield ReplyChunk(kind="done", finish_reason=finish_reason)
@@ -246,9 +281,14 @@ class StreamingEngineChat(BufferedEngineChat):
     """``jobs.stream`` per reply: the browser sees tokens as the runner produces them (D1, D20)."""
 
     async def open_reply(  # type: ignore[override]
-        self, user_id: UUID, turns: Sequence[ChatTurn], params: ChatParams, operation_ref: str
+        self,
+        user_id: UUID,
+        turns: Sequence[ChatTurn],
+        params: ChatParams,
+        operation_ref: str,
+        tools: Sequence[ToolSpec] = (),
     ) -> StreamingReply:
-        request = self._request(turns, params, operation_ref, stream=True)
+        request = self._request(turns, params, operation_ref, stream=True, tools=tools)
         try:
             job_stream = await self._engine.jobs.stream(actor_for(user_id), request)
         except JobFailed as exc:
@@ -312,6 +352,8 @@ def parse_completion(data: dict[str, Any]) -> list[ReplyChunk]:
     content = message.get("content")
     if isinstance(content, str) and content.strip():
         chunks.append(ReplyChunk(kind="content", text=content.strip("\n")))
+    for call in parse_tool_calls(message.get("tool_calls")):
+        chunks.append(ReplyChunk(kind="tool_call", tool_call=call))
     usage = parse_usage(data.get("usage"))
     if usage is not None:
         chunks.append(ReplyChunk(kind="usage", usage=usage))

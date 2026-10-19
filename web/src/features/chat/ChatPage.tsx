@@ -20,6 +20,7 @@ export function ChatPage() {
   const conversation = useConversation(conversationId);
   const model = useModel();
   const [live, setLive] = useState<Live | null>(null);
+  const [finished, setFinished] = useState<Message[]>([]); // messages completed during the current run
   const [pendingUser, setPendingUser] = useState<Message | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
@@ -34,8 +35,16 @@ export function ChatPage() {
       try {
         for await (const event of events(controller.signal)) {
           if (event.type === "start" && event.message) {
-            setPendingUser(event.user_message ?? null);
+            if (event.user_message) setPendingUser(event.user_message);
             setLive({ message: event.message, content: "", reasoning: "" });
+          } else if (event.type === "tool_call" && event.message) {
+            setLive((l) => (l ? { ...l, message: { ...l.message, kind: "tool_call", tool_calls: event.message!.tool_calls } } : l));
+          } else if (event.type === "image" && event.image) {
+            setLive((l) => (l ? { ...l, message: { ...l.message, images: [...l.message.images, event.image!] } } : l));
+          } else if (event.type === "done" && event.message) {
+            const done = event.message;
+            setFinished((list) => [...list, done]);
+            setLive(null);
           } else if (event.type === "content") {
             setLive((l) => (l ? { ...l, content: l.content + event.text } : l));
           } else if (event.type === "reasoning") {
@@ -52,6 +61,7 @@ export function ChatPage() {
         abort.current = null;
         setLive(null);
         setPendingUser(null);
+        setFinished([]);
         await client.invalidateQueries({ queryKey: conversationKeys.one(conversationId) });
         await client.invalidateQueries({ queryKey: conversationKeys.all });
         await client.invalidateQueries({ queryKey: ["usage", "me"] });
@@ -62,11 +72,15 @@ export function ChatPage() {
 
   const send = useCallback(
     (text: string) => {
+      setFinished([]);
       setPendingUser({
         id: "pending-user",
         conversation_id: conversationId,
         role: "user",
+        kind: "text",
         content: text,
+        tool_calls: [],
+        images: [],
         state: "complete",
         created_at: new Date().toISOString(),
       });
@@ -96,7 +110,7 @@ export function ChatPage() {
   const messages = conversation.data?.messages ?? [];
   const totals = conversation.data?.totals;
   const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
-  const busy = Boolean(live) || Boolean(pendingUser);
+  const busy = Boolean(live) || Boolean(pendingUser) || finished.length > 0;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -109,19 +123,23 @@ export function ChatPage() {
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 py-6">
           {messages
             .filter((m) => !(live && m.id === live.message.id))
-            .map((m) => (
+            .map((m, index, all) => (
               <MessageItem
                 key={m.id}
                 message={m}
+                attached={index > 0 && all[index - 1].role === "assistant" && all[index - 1].kind === "tool_call" && m.role === "assistant"}
                 canContinue={!busy && lastAssistant?.id === m.id}
                 onContinue={continueFrom}
               />
             ))}
           {pendingUser && !messages.some((m) => m.id === pendingUser.id) && <MessageItem message={pendingUser} />}
+          {finished
+            .filter((m) => !messages.some((x) => x.id === m.id))
+            .map((m) => <MessageItem key={m.id} message={m} />)}
           {live && (
             <MessageItem
               streaming
-              message={{ ...live.message, content: live.content, reasoning: live.reasoning || null, state: "streaming" }}
+              message={{ ...live.message, content: live.content, reasoning: live.reasoning || null, state: live.message.kind === "tool_call" ? live.message.state : "streaming" }}
             />
           )}
           {error && (

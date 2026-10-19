@@ -35,6 +35,8 @@ ENV PATH=/app/.venv/bin:$PATH \
     CHATLPT_STATIC_DIR=/app/web/dist \
     CHATLPT_DATABASE_URL=sqlite+aiosqlite:////data/chatlpt.db \
     CHATLPT_PRICING_FILE=/app/config/pricing/qwen3.8-27b.json \
+    CHATLPT_IMAGE_PRICING_FILE=/app/config/pricing/fal-flux-schnell.json \
+    CHATLPT_IMAGES_DIR=/data/images \
     LPB_DATABASE_URL=sqlite+aiosqlite:////data/livepeer-builder.db
 VOLUME ["/data"]
 USER 10001:10001

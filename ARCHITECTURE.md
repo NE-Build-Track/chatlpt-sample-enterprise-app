@@ -63,9 +63,10 @@ Each third-party package is confined to one module (enforced by `tests/structure
 
 | Package | Only in |
 | --- | --- |
-| `livepeer_builder` | `adapters/engine.py`, `adapters/discovery.py`, `runtime/engine.py` |
+| `livepeer_builder` | `adapters/engine.py`, `adapters/engine_images.py`, `adapters/discovery.py`, `runtime/engine.py` |
 | `livepeer_gateway` (discovery only) | `adapters/discovery.py` |
-| `authlib`, `httpx` | `adapters/oauth.py` |
+| `authlib` | `adapters/oauth.py` |
+| `httpx` | `adapters/oauth.py`, `adapters/images.py` |
 | `argon2` | `adapters/passwords.py` |
 | `sqlalchemy`, `alembic`, `aiosqlite` | `store/` |
 | `fastapi`, `starlette`, `itsdangerous` | `http/` |
@@ -79,6 +80,7 @@ Each third-party package is confined to one module (enforced by `tests/structure
 | Chat (a reply) | `services/chat.py`, `adapters/engine.py` | [chatlpt.md#chat](docs/product-specs/chatlpt.md#chat), [streaming](docs/design-docs/streaming-through-the-engine.md) |
 | Context window | `services/context.py` | [decisions D14](docs/design-docs/decisions.md) |
 | Billing (two books) | `services/billing.py`, `adapters/pricing.py` | [chatlpt.md#usage-and-cost](docs/product-specs/chatlpt.md#usage-and-cost) |
+| Images (model-driven) | `services/images.py`, `adapters/engine.py` (`EngineImages`), `adapters/images.py` | [decisions D25](docs/design-docs/decisions.md) |
 | Admin | `services/admin.py` | [chatlpt.md#admin](docs/product-specs/chatlpt.md#admin) |
 
 ## The engine boundary
@@ -108,3 +110,8 @@ Each third-party package is confined to one module (enforced by `tests/structure
    computed from the price table, and wholesale cost `pending`.
 6. A background task asks the engine for the job's cost until it is `delivered`, then fills the
    wholesale column. The engine is also told the token counts through `report_usage`.
+
+When the model answers with a `generate_image` tool call instead of text, the same pipeline branches:
+the assistant message becomes a `tool_call` message, `services/images.py` runs the image app through the
+engine, fetches the bytes from the runner's temporary URL onto the volume and writes the image's own
+ledger row, and a second model call with the tool result produces the caption as a separate message.

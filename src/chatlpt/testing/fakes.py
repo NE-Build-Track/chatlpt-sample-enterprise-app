@@ -9,6 +9,8 @@ from chatlpt.contracts import (
     ChatParams,
     ChatTurn,
     Conversation,
+    GeneratedImage,
+    ImagePriceTable,
     Message,
     ModelInfo,
     Money,
@@ -18,6 +20,7 @@ from chatlpt.contracts import (
     ReplyChunk,
     ThinkingLevel,
     TokenUsage,
+    ToolSpec,
     UsageRecord,
     UsageTotals,
     User,
@@ -106,19 +109,28 @@ class ScriptedBackend:
         self.costs: dict[UUID, WholesaleCost] = {}
         self.job_ids: list[UUID] = []
         self.model_info_calls = 0
+        self.tools_offered: list[list[ToolSpec]] = []
+        self.scripts: list[list[ReplyChunk]] = []  # per-call scripts, consumed before ``script``
 
     def ready(self) -> tuple[bool, str | None]:
         return self.available
 
     async def open_reply(
-        self, user_id: UUID, turns: Sequence[ChatTurn], params: ChatParams, operation_ref: str
+        self,
+        user_id: UUID,
+        turns: Sequence[ChatTurn],
+        params: ChatParams,
+        operation_ref: str,
+        tools: Sequence[ToolSpec] = (),
     ) -> ScriptedReply:
         self.calls.append((user_id, list(turns), params, operation_ref))
+        self.tools_offered.append(list(tools))
         if self.fail_with is not None:
             raise self.fail_with
         job_id = UUID(int=len(self.calls))
         self.job_ids.append(job_id)
-        return ScriptedReply(job_id, "https://orch.test:8935", self.script)
+        script = self.scripts.pop(0) if self.scripts else self.script
+        return ScriptedReply(job_id, "https://orch.test:8935", script)
 
     async def model_info(self, user_id: UUID) -> ModelInfo:
         self.model_info_calls += 1
@@ -136,10 +148,91 @@ class ScriptedBackend:
         self.reported.append((job_id, usage))
 
 
+class StaticImagePrices:
+    def __init__(self, table: ImagePriceTable | None = None) -> None:
+        self._table = table or ImagePriceTable(
+            model="fal-ai/flux/schnell",
+            vendor="test",
+            region="test",
+            currency="USD",
+            unit="megapixel",
+            price_per_unit=Decimal("0.003"),
+            rounding="up to the nearest megapixel",
+            source_url="https://example.test/flux",
+            observed_at=datetime(2026, 10, 19, tzinfo=UTC),
+        )
+
+    def table(self) -> ImagePriceTable:
+        return self._table
+
+
+class ScriptedImageResult:
+    def __init__(self, job_id: UUID, *, width: int = 1024, height: int = 768, flagged: bool = False) -> None:
+        self.url = f"https://images.test/{job_id}.jpg"
+        self.width = width
+        self.height = height
+        self.seed = 42
+        self.content_type = "image/jpeg"
+        self.flagged = flagged
+        self.job_id = job_id
+        self.orchestrator_url = "https://ai1.test:8936"
+
+
+class ScriptedImageBackend:
+    """Generates scripted images; records every call. ``fail_with`` raises instead."""
+
+    def __init__(self, *, app: str = "comfystream/fal-flux-schnell") -> None:
+        self.app = app
+        self.calls: list[tuple[UUID, str, str, str]] = []
+        self.fail_with: AppError | None = None
+        self.available: tuple[bool, str | None] = (True, None)
+        self.size: tuple[int, int] = (1024, 768)
+        self.flagged = False
+
+    def ready(self) -> tuple[bool, str | None]:
+        return self.available
+
+    async def generate(
+        self, user_id: UUID, prompt: str, image_size: str, operation_ref: str
+    ) -> ScriptedImageResult:
+        self.calls.append((user_id, prompt, image_size, operation_ref))
+        if self.fail_with is not None:
+            raise self.fail_with
+        job_id = UUID(int=1000 + len(self.calls))
+        return ScriptedImageResult(job_id, width=self.size[0], height=self.size[1], flagged=self.flagged)
+
+
+class MemoryImageFiles:
+    """Image bytes in a dictionary; ``fetch`` returns a fixed JPEG-like payload."""
+
+    def __init__(self) -> None:
+        self.files: dict[str, bytes] = {}
+        self.fetched: list[str] = []
+        self.fail_fetch: bool = False
+
+    async def fetch(self, url: str) -> bytes:
+        self.fetched.append(url)
+        if self.fail_fetch:
+            raise AppError("fetch failed")
+        return b"\xff\xd8\xff" + url.encode()
+
+    def save(self, image_id: UUID, content_type: str, data: bytes) -> str:
+        relative = f"{image_id}.jpg"
+        self.files[relative] = data
+        return relative
+
+    def path(self, relative: str) -> str:
+        return f"/memory/{relative}"
+
+    def delete(self, relative: str) -> None:
+        self.files.pop(relative, None)
+
+
 class MemoryStore:
     """The AppStore in dictionaries. Passes the same contract tests as SqlStore (tests/store)."""
 
     def __init__(self) -> None:
+        self.images: dict[UUID, tuple[GeneratedImage, str]] = {}
         self.users: dict[UUID, User] = {}
         self.hashes: dict[UUID, str] = {}
         self.identities: dict[tuple[str, str], UUID] = {}
@@ -222,11 +315,41 @@ class MemoryStore:
         self.messages[message.id] = message
 
     async def get_message(self, message_id: UUID) -> Message | None:
-        return self.messages.get(message_id)
+        message = self.messages.get(message_id)
+        if message is None:
+            return None
+        images = await self.images_for_messages([message_id])
+        return message.model_copy(update={"images": tuple(images.get(message_id, []))})
 
     async def list_messages(self, conversation_id: UUID) -> list[Message]:
         mine = [m for m in self.messages.values() if m.conversation_id == conversation_id]
-        return sorted(mine, key=lambda m: (m.created_at, str(m.id)))
+        images = await self.images_for_messages([m.id for m in mine])
+        return sorted(
+            (m.model_copy(update={"images": tuple(images.get(m.id, []))}) for m in mine),
+            key=lambda m: (m.created_at, str(m.id)),
+        )
+
+    # images
+    async def add_image(self, image: GeneratedImage, path: str) -> None:
+        self.images[image.id] = (image, path)
+
+    async def get_image(self, image_id: UUID) -> tuple[GeneratedImage, str] | None:
+        return self.images.get(image_id)
+
+    async def images_for_messages(self, message_ids: Sequence[UUID]) -> dict[UUID, list[GeneratedImage]]:
+        wanted = set(message_ids)
+        grouped: dict[UUID, list[GeneratedImage]] = {}
+        for image, _ in sorted(self.images.values(), key=lambda x: x[0].created_at):
+            if image.message_id in wanted:
+                grouped.setdefault(image.message_id, []).append(image)
+        return grouped
+
+    async def images_older_than(self, cutoff: datetime) -> list[tuple[GeneratedImage, str]]:
+        return [(i, p) for i, p in self.images.values() if i.created_at < cutoff and not i.expired]
+
+    async def mark_image_expired(self, image_id: UUID) -> None:
+        image, path = self.images[image_id]
+        self.images[image_id] = (image.model_copy(update={"expired": True}), path)
 
     # ledger
     async def record(self, record: UsageRecord) -> None:
@@ -237,6 +360,9 @@ class MemoryStore:
         self.records[message_id] = record.model_copy(update={"wholesale": wholesale})
         if message_id in self.messages:
             self.messages[message_id] = self.messages[message_id].model_copy(update={"wholesale": wholesale})
+        if message_id in self.images:
+            image, path = self.images[message_id]
+            self.images[message_id] = (image.model_copy(update={"wholesale": wholesale}), path)
 
     async def pending_wholesale(
         self, limit: int = 100, settling_since: datetime | None = None
@@ -284,7 +410,7 @@ def totals_of(
         user_id=user_id,
         start=start,
         end=end,
-        replies=len(items),
+        replies=sum(1 for x in items if x.kind == "chat"),
         prompt_tokens=sum(x.usage.prompt_tokens for x in items),
         completion_tokens=sum(x.usage.completion_tokens for x in items),
         reasoning_tokens=sum(x.usage.reasoning_tokens for x in items),
@@ -296,4 +422,5 @@ def totals_of(
             currency="USD",
         ),
         wholesale_pending=sum(1 for x in items if x.wholesale.status == "pending"),
+        images=sum(1 for x in items if x.kind == "image"),
     )

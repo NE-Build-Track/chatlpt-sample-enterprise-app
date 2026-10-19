@@ -81,6 +81,7 @@ async def test_continue_sends_the_partial_answer_as_the_final_turn(
         ReplyChunk(kind="usage", usage=TokenUsage(prompt_tokens=60, completion_tokens=7)),
         ReplyChunk(kind="done", finish_reason="stop"),
     ]
+    application.clock.advance(seconds=5)  # type: ignore[attr-defined]  the fixed clock would tie the order
     events = await collect(application.chat.start_continue(user, conversation.id, first.id))
     assert [e.type for e in events] == ["start", "content", "done"]
     segment = events[-1].message
@@ -119,6 +120,7 @@ async def test_continue_refuses_the_wrong_targets(application: Application, back
     with pytest.raises(InvalidRequest, match="no answer text"):
         async for _ in application.chat.continue_reply(user, conversation.id, empty.id):
             pass
+    application.clock.advance(seconds=5)  # type: ignore[attr-defined]  the fixed clock would tie the order
     backend.script = [ReplyChunk(kind="content", text="ok"), ReplyChunk(kind="done", finish_reason="stop")]
     events = await collect(application.chat.start_reply(user, conversation.id, NewMessage(content="again")))
     with pytest.raises(InvalidRequest, match="latest reply"):

@@ -6,7 +6,7 @@ import { Composer } from "./Composer";
 const EXAMPLES = [
   "Explain how probabilistic micropayments work in two paragraphs.",
   "Write a Python function that parses server-sent events.",
-  "Compare wholesale and retail pricing for an inference product.",
+  "Draw a watercolor lighthouse at sunset.",
 ];
 
 export function EmptyChat() {

@@ -142,3 +142,79 @@ async def test_model_info_cache(app_store: AppStore) -> None:
     await app_store.put_model_info(info.model_copy(update={"max_model_len": 8192}))
     loaded = await app_store.get_model_info(info.app)
     assert loaded is not None and loaded.max_model_len == 8192
+
+
+async def test_images_round_trip_group_and_expire(app_store: AppStore) -> None:
+    from chatlpt.contracts import GeneratedImage
+
+    alice = user("img@example.com")
+    await app_store.create_user(alice, None)
+    conversation = Conversation(
+        id=uuid4(), user_id=alice.id, title="Pictures", created_at=NOW, updated_at=NOW
+    )
+    await app_store.create_conversation(conversation)
+    tool_message = Message(
+        id=uuid4(),
+        conversation_id=conversation.id,
+        role="assistant",
+        kind="tool_call",
+        content="",
+        created_at=NOW,
+    )
+    await app_store.add_message(tool_message)
+    image = GeneratedImage(
+        id=uuid4(),
+        message_id=tool_message.id,
+        conversation_id=conversation.id,
+        prompt="a fox",
+        image_size="square",
+        width=1024,
+        height=768,
+        seed=5,
+        content_type="image/jpeg",
+        size_bytes=1234,
+        job_id=uuid4(),
+        orchestrator_url="https://ai1",
+        retail=Money(amount=Decimal("0.003")),
+        wholesale=WholesaleCost.pending(),
+        created_at=NOW,
+    )
+    await app_store.add_image(image, f"{image.id}.jpg")
+    found = await app_store.get_image(image.id)
+    assert found is not None and found[0].prompt == "a fox" and found[1] == f"{image.id}.jpg"
+    listed = await app_store.list_messages(conversation.id)
+    assert listed[0].kind == "tool_call" and [i.id for i in listed[0].images] == [image.id]
+    got = await app_store.get_message(tool_message.id)
+    assert got is not None and got.images[0].width == 1024
+    assert await app_store.images_for_messages([]) == {}
+    # the ledger row for the image updates the image's wholesale too
+    await app_store.record(
+        UsageRecord(
+            message_id=image.id,
+            kind="image",
+            user_id=alice.id,
+            conversation_id=conversation.id,
+            job_id=image.job_id,
+            usage=TokenUsage(prompt_tokens=0, completion_tokens=0),
+            retail=Money(amount=Decimal("0.003")),
+            wholesale=WholesaleCost.pending(),
+            created_at=NOW,
+        )
+    )
+    paid = WholesaleCost(status="delivered", amount=Money(amount=Decimal("0.003007")), updated_at=NOW)
+    await app_store.update_wholesale(image.id, paid)
+    refreshed = await app_store.get_image(image.id)
+    assert (
+        refreshed is not None
+        and refreshed[0].wholesale is not None
+        and refreshed[0].wholesale.status == "delivered"
+    )
+    totals = await app_store.conversation_totals(conversation.id)
+    assert totals.images == 1 and totals.replies == 0
+    assert await app_store.images_older_than(NOW) == []
+    old = await app_store.images_older_than(NOW + timedelta(days=1))
+    assert [i.id for i, _ in old] == [image.id]
+    await app_store.mark_image_expired(image.id)
+    expired = await app_store.get_image(image.id)
+    assert expired is not None and expired[0].expired
+    assert await app_store.images_older_than(NOW + timedelta(days=1)) == []

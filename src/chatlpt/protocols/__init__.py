@@ -12,6 +12,8 @@ from chatlpt.contracts import (
     ChatParams,
     ChatTurn,
     Conversation,
+    GeneratedImage,
+    ImagePriceTable,
     Message,
     ModelInfo,
     OAuthIdentity,
@@ -20,6 +22,7 @@ from chatlpt.contracts import (
     ReplyChunk,
     ThinkingLevel,
     TokenUsage,
+    ToolSpec,
     UsageRecord,
     UsageTotals,
     User,
@@ -147,7 +150,12 @@ class ChatBackend(Protocol):
     app: str  # the runner app, for example blueclaw/chat/qwen3.8-27b
 
     async def open_reply(
-        self, user_id: UUID, turns: Sequence[ChatTurn], params: ChatParams, operation_ref: str
+        self,
+        user_id: UUID,
+        turns: Sequence[ChatTurn],
+        params: ChatParams,
+        operation_ref: str,
+        tools: Sequence[ToolSpec] = (),
     ) -> ReplyStream: ...
 
     async def model_info(self, user_id: UUID) -> ModelInfo: ...  # billed; cache it
@@ -157,6 +165,74 @@ class ChatBackend(Protocol):
     async def report_usage(self, user_id: UUID, job_id: UUID, usage: TokenUsage) -> None: ...
 
     def ready(self) -> tuple[bool, str | None]: ...  # (chat available, reason when not)
+
+
+class ImageResult(Protocol):
+    """What one image job produced."""
+
+    @property
+    def url(self) -> str: ...
+
+    @property
+    def width(self) -> int: ...
+
+    @property
+    def height(self) -> int: ...
+
+    @property
+    def seed(self) -> int | None: ...
+
+    @property
+    def content_type(self) -> str: ...
+
+    @property
+    def flagged(self) -> bool: ...  # the safety checker flagged it (the bytes are black)
+
+    @property
+    def job_id(self) -> UUID | None: ...
+
+    @property
+    def orchestrator_url(self) -> str | None: ...
+
+
+class ImageBackend(Protocol):
+    """The image app, through the engine (D25)."""
+
+    app: str
+
+    async def generate(
+        self, user_id: UUID, prompt: str, image_size: str, operation_ref: str
+    ) -> ImageResult: ...
+
+    def ready(self) -> tuple[bool, str | None]: ...
+
+
+class ImageFiles(Protocol):
+    """Where generated images live: fetched from the runner's temporary URL, kept on our volume."""
+
+    async def fetch(self, url: str) -> bytes: ...
+
+    def save(self, image_id: UUID, content_type: str, data: bytes) -> str: ...  # returns the relative path
+
+    def path(self, relative: str) -> str: ...  # absolute path for serving
+
+    def delete(self, relative: str) -> None: ...
+
+
+class ImagePriceSource(Protocol):
+    def table(self) -> ImagePriceTable: ...
+
+
+class ImageRepo(Protocol):
+    async def add_image(self, image: GeneratedImage, path: str) -> None: ...
+
+    async def get_image(self, image_id: UUID) -> tuple[GeneratedImage, str] | None: ...  # with its path
+
+    async def images_for_messages(self, message_ids: Sequence[UUID]) -> dict[UUID, list[GeneratedImage]]: ...
+
+    async def images_older_than(self, cutoff: datetime) -> list[tuple[GeneratedImage, str]]: ...
+
+    async def mark_image_expired(self, image_id: UUID) -> None: ...
 
 
 class ModelMetadataSource(Protocol):
@@ -171,7 +247,7 @@ class ModelInfoCache(Protocol):
     async def put_model_info(self, info: ModelInfo) -> None: ...
 
 
-class AppStore(UserStore, ConversationStore, UsageLedger, ModelInfoCache, Protocol):
+class AppStore(UserStore, ConversationStore, UsageLedger, ModelInfoCache, ImageRepo, Protocol):
     """Every app-owned record, behind one interface. SQL implementation: chatlpt.store."""
 
     async def close(self) -> None: ...

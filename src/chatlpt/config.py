@@ -65,6 +65,13 @@ class Settings(Contract):
     model_info_ttl_hours: int = Field(default=24, ge=1)
     history_turn_limit: int = Field(default=60, ge=1)
 
+    # images (D25): the assistant draws through a tool call; the app runs the image app and keeps the file
+    image_app: str = "comfystream/fal-flux-schnell"
+    tools_enabled: bool = True
+    images_dir: str = "./.local/images"
+    image_retention_days: int = Field(default=30, ge=1)
+    image_pricing_file: str = "config/pricing/fal-flux-schnell.json"
+
     # billing
     pricing_file: str = "config/pricing/qwen3.8-27b.json"
     wholesale_sync_interval_s: float = Field(default=20.0, gt=0)

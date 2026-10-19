@@ -1,16 +1,19 @@
 """Row ↔ contract conversion. Decimals are text in SQLite; datetimes come back naive and are made UTC."""
 
-from collections.abc import Mapping
+import json
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 from chatlpt.contracts import (
     Conversation,
+    GeneratedImage,
     Message,
     ModelInfo,
     Money,
     TokenUsage,
+    ToolCall,
     UsageRecord,
     User,
     WholesaleCost,
@@ -20,6 +23,14 @@ from chatlpt.utils import utc
 
 def _dec(value: Any) -> Decimal | None:
     return None if value is None else Decimal(str(value))
+
+
+def _uuid(value: Any) -> UUID | None:
+    return None if value is None else UUID(str(value))
+
+
+def _text_id(value: UUID | None) -> str | None:
+    return None if value is None else str(value)
 
 
 def _money(value: Any) -> Money | None:
@@ -73,13 +84,16 @@ def wholesale_from(row: Mapping[Any, Any], *, url_key: str | None = None) -> Who
     )
 
 
-def message_from(row: Mapping[Any, Any]) -> Message:
+def message_from(row: Mapping[Any, Any], images: Sequence[GeneratedImage] = ()) -> Message:
     return Message(
         id=UUID(row["id"]),
         conversation_id=UUID(row["conversation_id"]),
         role=row["role"],
+        kind=row["kind"] or "text",
         content=row["content"],
         reasoning=row["reasoning"],
+        tool_calls=tool_calls_from(row["tool_calls"]),
+        images=tuple(images),
         state=row["state"],
         job_id=None if row["job_id"] is None else UUID(row["job_id"]),
         orchestrator_url=row["orchestrator_url"],
@@ -103,8 +117,12 @@ def message_values(message: Message) -> dict[str, Any]:
         "id": str(message.id),
         "conversation_id": str(message.conversation_id),
         "role": message.role,
+        "kind": message.kind,
         "content": message.content,
         "reasoning": message.reasoning,
+        "tool_calls": json.dumps([c.model_dump() for c in message.tool_calls])
+        if message.tool_calls
+        else None,
         "state": message.state,
         "job_id": None if message.job_id is None else str(message.job_id),
         "orchestrator_url": message.orchestrator_url,
@@ -128,6 +146,65 @@ def message_values(message: Message) -> dict[str, Any]:
     }
 
 
+def tool_calls_from(raw: Any) -> tuple[ToolCall, ...]:
+    if not raw:
+        return ()
+    try:
+        items = json.loads(raw)
+    except ValueError:
+        return ()
+    return tuple(ToolCall.model_validate(item) for item in items if isinstance(item, dict))
+
+
+def image_from(row: Mapping[Any, Any]) -> GeneratedImage:
+    return GeneratedImage(
+        id=UUID(row["id"]),
+        message_id=UUID(row["message_id"]),
+        conversation_id=UUID(row["conversation_id"]),
+        prompt=row["prompt"],
+        image_size=row["image_size"],
+        width=row["width"],
+        height=row["height"],
+        seed=row["seed"],
+        content_type=row["content_type"],
+        size_bytes=row["size_bytes"],
+        job_id=_uuid(row["job_id"]),
+        orchestrator_url=row["orchestrator_url"],
+        retail=_money(row["retail_usd"]),
+        wholesale=wholesale_from(row, url_key="orchestrator_url"),
+        expired=row["expired_at"] is not None,
+        created_at=utc(row["created_at"]),
+    )
+
+
+def image_values(image: GeneratedImage, path: str, user_id: UUID) -> dict[str, Any]:
+    wholesale = image.wholesale
+    return {
+        "id": str(image.id),
+        "message_id": str(image.message_id),
+        "conversation_id": str(image.conversation_id),
+        "user_id": str(user_id),
+        "prompt": image.prompt,
+        "image_size": image.image_size,
+        "width": image.width,
+        "height": image.height,
+        "seed": image.seed,
+        "content_type": image.content_type,
+        "size_bytes": image.size_bytes,
+        "path": path,
+        "job_id": _text_id(image.job_id),
+        "orchestrator_url": image.orchestrator_url,
+        "retail_usd": None if image.retail is None else str(image.retail.amount),
+        "wholesale_status": None if wholesale is None else wholesale.status,
+        "wholesale_usd": None
+        if wholesale is None or wholesale.amount is None
+        else str(wholesale.amount.amount),
+        "wholesale_updated_at": None if wholesale is None else wholesale.updated_at,
+        "expired_at": None,
+        "created_at": image.created_at,
+    }
+
+
 def usage_record_from(row: Mapping[Any, Any]) -> UsageRecord:
     usage = usage_from(row)
     assert usage is not None  # the ledger columns are NOT NULL
@@ -135,6 +212,7 @@ def usage_record_from(row: Mapping[Any, Any]) -> UsageRecord:
     assert wholesale is not None
     return UsageRecord(
         message_id=UUID(row["message_id"]),
+        kind=row["kind"] or "chat",
         user_id=UUID(row["user_id"]),
         conversation_id=UUID(row["conversation_id"]),
         job_id=None if row["job_id"] is None else UUID(row["job_id"]),
@@ -148,6 +226,7 @@ def usage_record_from(row: Mapping[Any, Any]) -> UsageRecord:
 def usage_record_values(record: UsageRecord) -> dict[str, Any]:
     return {
         "message_id": str(record.message_id),
+        "kind": record.kind,
         "user_id": str(record.user_id),
         "conversation_id": str(record.conversation_id),
         "job_id": None if record.job_id is None else str(record.job_id),

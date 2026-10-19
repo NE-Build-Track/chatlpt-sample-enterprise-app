@@ -53,8 +53,10 @@ messages = Table(
     Column("id", String(ID), primary_key=True),
     Column("conversation_id", String(ID), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False),
     Column("role", String(16), nullable=False),
+    Column("kind", String(16), nullable=False, server_default="text"),
     Column("content", Text, nullable=False),
     Column("reasoning", Text, nullable=True),
+    Column("tool_calls", Text, nullable=True),  # JSON list of {id, name, arguments}
     Column("state", String(16), nullable=False),
     Column("job_id", String(ID), nullable=True),
     Column("orchestrator_url", String(255), nullable=True),
@@ -78,7 +80,8 @@ messages = Table(
 usage_records = Table(
     "usage_records",
     metadata,
-    Column("message_id", String(ID), primary_key=True),
+    Column("message_id", String(ID), primary_key=True),  # the record key: message id or image id
+    Column("kind", String(8), nullable=False, server_default="chat"),
     Column("user_id", String(ID), nullable=False),
     Column("conversation_id", String(ID), nullable=False),
     Column("job_id", String(ID), nullable=True),
@@ -95,6 +98,33 @@ usage_records = Table(
     Index("ix_usage_user_created", "user_id", "created_at"),
     Index("ix_usage_conversation", "conversation_id"),
     Index("ix_usage_wholesale_status", "wholesale_status"),
+)
+
+images = Table(
+    "images",
+    metadata,
+    Column("id", String(ID), primary_key=True),
+    Column("message_id", String(ID), ForeignKey("messages.id", ondelete="CASCADE"), nullable=False),
+    Column("conversation_id", String(ID), nullable=False),
+    Column("user_id", String(ID), nullable=False),
+    Column("prompt", Text, nullable=False),
+    Column("image_size", String(32), nullable=False),
+    Column("width", Integer, nullable=False),
+    Column("height", Integer, nullable=False),
+    Column("seed", Integer, nullable=True),
+    Column("content_type", String(64), nullable=False),
+    Column("size_bytes", Integer, nullable=False),
+    Column("path", String(255), nullable=False),
+    Column("job_id", String(ID), nullable=True),
+    Column("orchestrator_url", String(255), nullable=True),
+    Column("retail_usd", String(DEC), nullable=True),
+    Column("wholesale_status", String(24), nullable=True),
+    Column("wholesale_usd", String(DEC), nullable=True),
+    Column("wholesale_updated_at", DateTime(timezone=True), nullable=True),
+    Column("expired_at", DateTime(timezone=True), nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Index("ix_images_message", "message_id"),
+    Index("ix_images_created", "created_at"),
 )
 
 model_info = Table(

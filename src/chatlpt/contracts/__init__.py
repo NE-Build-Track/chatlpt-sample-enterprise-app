@@ -1,6 +1,8 @@
 """Types layer: frozen pydantic models that cross a boundary. Imports nothing else in the package."""
 
 from chatlpt.contracts.billing import (
+    ImagePriceTable,
+    LedgerKind,
     PriceTable,
     TokenUsage,
     UsageRecord,
@@ -13,7 +15,9 @@ from chatlpt.contracts.chat import (
     ChatTurn,
     ChunkKind,
     Conversation,
+    GeneratedImage,
     Message,
+    MessageKind,
     ModelInfo,
     NewMessage,
     ReplyChunk,
@@ -22,6 +26,8 @@ from chatlpt.contracts.chat import (
     ReplyState,
     Role,
     ThinkingLevel,
+    ToolCall,
+    ToolSpec,
     UpdateConversation,
 )
 from chatlpt.contracts.common import Contract, Currency, Money
@@ -44,8 +50,12 @@ __all__ = [
     "Contract",
     "Conversation",
     "Currency",
+    "GeneratedImage",
+    "ImagePriceTable",
+    "LedgerKind",
     "Login",
     "Message",
+    "MessageKind",
     "ModelInfo",
     "Money",
     "NewMessage",
@@ -61,6 +71,8 @@ __all__ = [
     "SessionClaims",
     "ThinkingLevel",
     "TokenUsage",
+    "ToolCall",
+    "ToolSpec",
     "UpdateConversation",
     "UsageRecord",
     "UsageTotals",

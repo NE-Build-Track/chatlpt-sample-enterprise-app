@@ -3,7 +3,8 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { ChevronDown, ChevronRight, Copy } from "lucide-react";
-import type { Message } from "@/api/schemas";
+import type { GeneratedImage, Message } from "@/api/schemas";
+import { Download } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { describeWholesale, formatMoney, formatTokens } from "@/features/usage/format";
@@ -14,11 +15,13 @@ export function MessageItem({
   streaming = false,
   onContinue,
   canContinue = false,
+  attached = false,
 }: {
   message: Message;
   streaming?: boolean;
   onContinue?: (message: Message) => void;
   canContinue?: boolean;
+  attached?: boolean;
 }) {
   if (message.role === "user") {
     return (
@@ -27,7 +30,10 @@ export function MessageItem({
       </div>
     );
   }
-  const continuation = Boolean(message.continues_message_id);
+  const continuation = Boolean(message.continues_message_id) || attached;
+  if (message.kind === "tool_call") {
+    return <ImageBlock message={message} streaming={streaming} />;
+  }
   return (
     <div className={cn("space-y-2", continuation && "-mt-4")}>
       {message.dropped_turns ? (
@@ -69,6 +75,60 @@ export function MessageItem({
       )}
       {message.state === "complete" && <CostLine message={message} />}
     </div>
+  );
+}
+
+function ImageBlock({ message, streaming }: { message: Message; streaming: boolean }) {
+  const prompts = message.tool_calls.map((c) => String(c.arguments.prompt ?? ""));
+  return (
+    <div className="space-y-2">
+      {message.reasoning && <Thinking text={message.reasoning} streaming={streaming && message.images.length === 0} />}
+      {message.images.length === 0 && message.state !== "failed" && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span className="inline-block size-2 animate-pulse rounded-full bg-muted-foreground" />
+          Generating image{prompts[0] ? `: ${prompts[0].slice(0, 80)}${prompts[0].length > 80 ? "…" : ""}` : "…"}
+        </div>
+      )}
+      <div className="flex flex-wrap gap-3">
+        {message.images.map((image) => (
+          <ImageCard key={image.id} image={image} />
+        ))}
+      </div>
+      {message.state === "failed" && <p className="text-sm text-destructive">The image could not be generated: {message.error ?? "unknown error"}</p>}
+      {message.state === "uncertain" && <p className="text-sm text-destructive">Payment went out but the image did not arrive.</p>}
+    </div>
+  );
+}
+
+function ImageCard({ image }: { image: GeneratedImage }) {
+  const src = `/api/images/${image.id}`;
+  const wholesale = describeWholesale(image.wholesale);
+  const portrait = image.height > image.width;
+  return (
+    <figure className={cn("overflow-hidden rounded-xl border bg-muted", portrait ? "w-72" : "w-96 max-w-full")}>
+      {image.expired ? (
+        <div className="flex aspect-[4/3] items-center justify-center text-sm text-muted-foreground">This image has expired.</div>
+      ) : (
+        <img src={src} alt={image.prompt} width={image.width} height={image.height} className="block h-auto w-full" loading="lazy" />
+      )}
+      <figcaption className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="min-w-0 flex-1 cursor-default break-words">{image.width}×{image.height} · retail {formatMoney(image.retail)} · {wholesale.label}</span>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-sm">
+            <p className="mb-1 font-medium">Prompt</p>
+            <p>{image.prompt}</p>
+            {image.seed !== null && image.seed !== undefined && <p className="mt-1">Seed {image.seed}</p>}
+          </TooltipContent>
+        </Tooltip>
+        {!image.expired && (
+          <a href={src} download={`chatlpt-${image.id}.${image.content_type === "image/png" ? "png" : "jpg"}`} className="rounded p-1 hover:bg-accent hover:text-foreground" aria-label="Download image">
+            <Download className="size-3.5" />
+          </a>
+        )}
+      </figcaption>
+    </figure>
   );
 }
 

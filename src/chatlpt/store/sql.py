@@ -1,7 +1,7 @@
 """``SqlStore``: the AppStore over SQLAlchemy Core. One class, one SQLite file, WAL mode."""
 
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from chatlpt.contracts import (
     Conversation,
+    GeneratedImage,
     Message,
     ModelInfo,
     Money,
@@ -206,7 +207,10 @@ class SqlStore:
                 .mappings()
                 .first()
             )
-        return r.message_from(row) if row else None
+        if not row:
+            return None
+        images = await self.images_for_messages([message_id])
+        return r.message_from(row, images.get(message_id, []))
 
     async def list_messages(self, conversation_id: UUID) -> list[Message]:
         query = (
@@ -215,7 +219,58 @@ class SqlStore:
             .order_by(t.messages.c.created_at, t.messages.c.id)
         )
         async with self.engine.connect() as conn:
-            return [r.message_from(row) for row in (await conn.execute(query)).mappings()]
+            rows = list((await conn.execute(query)).mappings())
+        images = await self.images_for_messages([UUID(row["id"]) for row in rows])
+        return [r.message_from(row, images.get(UUID(row["id"]), [])) for row in rows]
+
+    # -- images -------------------------------------------------------------------------------------
+
+    async def add_image(self, image: GeneratedImage, path: str) -> None:
+        async with self.engine.connect() as conn:
+            owner = (
+                await conn.execute(
+                    select(t.conversations.c.user_id).where(
+                        t.conversations.c.id == str(image.conversation_id)
+                    )
+                )
+            ).scalar_one()
+        async with self.engine.begin() as conn:
+            await conn.execute(insert(t.images).values(r.image_values(image, path, UUID(str(owner)))))
+
+    async def get_image(self, image_id: UUID) -> tuple[GeneratedImage, str] | None:
+        async with self.engine.connect() as conn:
+            row = (
+                (await conn.execute(select(t.images).where(t.images.c.id == str(image_id))))
+                .mappings()
+                .first()
+            )
+        return (r.image_from(row), str(row["path"])) if row else None
+
+    async def images_for_messages(self, message_ids: Sequence[UUID]) -> dict[UUID, list[GeneratedImage]]:
+        if not message_ids:
+            return {}
+        query = (
+            select(t.images)
+            .where(t.images.c.message_id.in_([str(m) for m in message_ids]))
+            .order_by(t.images.c.created_at)
+        )
+        grouped: dict[UUID, list[GeneratedImage]] = {}
+        async with self.engine.connect() as conn:
+            for row in (await conn.execute(query)).mappings():
+                image = r.image_from(row)
+                grouped.setdefault(image.message_id, []).append(image)
+        return grouped
+
+    async def images_older_than(self, cutoff: datetime) -> list[tuple[GeneratedImage, str]]:
+        query = select(t.images).where(t.images.c.created_at < cutoff, t.images.c.expired_at.is_(None))
+        async with self.engine.connect() as conn:
+            return [(r.image_from(row), str(row["path"])) for row in (await conn.execute(query)).mappings()]
+
+    async def mark_image_expired(self, image_id: UUID) -> None:
+        async with self.engine.begin() as conn:
+            await conn.execute(
+                update(t.images).where(t.images.c.id == str(image_id)).values(expired_at=datetime.now(tz=UTC))
+            )
 
     # -- the ledger ---------------------------------------------------------------------------------
 
@@ -236,15 +291,16 @@ class SqlStore:
                     wholesale_updated_at=wholesale.updated_at,
                 )
             )
-            await conn.execute(
-                update(t.messages)
-                .where(t.messages.c.id == str(message_id))
-                .values(
-                    wholesale_status=wholesale.status,
-                    wholesale_usd=amount,
-                    wholesale_updated_at=wholesale.updated_at,
+            for table in (t.messages, t.images):
+                await conn.execute(
+                    update(table)
+                    .where(table.c.id == str(message_id))
+                    .values(
+                        wholesale_status=wholesale.status,
+                        wholesale_usd=amount,
+                        wholesale_updated_at=wholesale.updated_at,
+                    )
                 )
-            )
 
     async def pending_wholesale(
         self, limit: int = 100, settling_since: datetime | None = None
@@ -318,11 +374,12 @@ def _totals(
         user_id=user_id,
         start=start,
         end=end,
-        replies=len(records),
+        replies=sum(1 for x in records if x.kind == "chat"),
         prompt_tokens=sum(x.usage.prompt_tokens for x in records),
         completion_tokens=sum(x.usage.completion_tokens for x in records),
         reasoning_tokens=sum(x.usage.reasoning_tokens for x in records),
         retail=Money(amount=retail, currency="USD"),
         wholesale=Money(amount=wholesale, currency="USD"),
         wholesale_pending=sum(1 for x in records if x.wholesale.status == "pending"),
+        images=sum(1 for x in records if x.kind == "image"),
     )

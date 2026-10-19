@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 async def test_build_engine_is_none_without_a_signer(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("LPB_SIGNER_URL", raising=False)
     monkeypatch.delenv("LPB_DISCOVERY_URL", raising=False)
-    assert await build_engine(app="a", approved_hosts=frozenset(), clock=FixedClock()) is None
+    assert await build_engine(apps=frozenset({"a"}), approved_hosts=frozenset(), clock=FixedClock()) is None
 
 
 async def test_build_engine_with_a_signer_wires_the_filtered_discovery(
@@ -28,7 +28,7 @@ async def test_build_engine_with_a_signer_wires_the_filtered_discovery(
     monkeypatch.setenv("LPB_SIGNER_URL", "http://signer.test:8937")
     monkeypatch.setenv("LPB_DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path}/engine.db")
     monkeypatch.delenv("LPB_BATTERIES_URL", raising=False)
-    built = await build_engine(app="a", approved_hosts=frozenset({"h"}), clock=FixedClock())
+    built = await build_engine(apps=frozenset({"a"}), approved_hosts=frozenset({"h"}), clock=FixedClock())
     assert built is not None
     engine, source = built
     assert source.model_from_discovery("a") is None

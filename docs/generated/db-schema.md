@@ -9,6 +9,7 @@ erDiagram
     users ||--o{ conversations : has
     users ||--o{ identities : has
     conversations ||--o{ messages : has
+    messages ||--o{ images : has
 ```
 
 ## `model_info`
@@ -25,6 +26,7 @@ erDiagram
 | Column | Type | Nullable | Notes |
 | --- | --- | --- | --- |
 | `message_id` | VARCHAR(36) | no | primary key |
+| `kind` | VARCHAR(8) | no |  |
 | `user_id` | VARCHAR(36) | no |  |
 | `conversation_id` | VARCHAR(36) | no |  |
 | `job_id` | VARCHAR(36) | yes |  |
@@ -79,8 +81,10 @@ erDiagram
 | `id` | VARCHAR(36) | no | primary key |
 | `conversation_id` | VARCHAR(36) | no | → conversations.id |
 | `role` | VARCHAR(16) | no |  |
+| `kind` | VARCHAR(16) | no |  |
 | `content` | TEXT | no |  |
 | `reasoning` | TEXT | yes |  |
+| `tool_calls` | TEXT | yes |  |
 | `state` | VARCHAR(16) | no |  |
 | `job_id` | VARCHAR(36) | yes |  |
 | `orchestrator_url` | VARCHAR(255) | yes |  |
@@ -96,4 +100,29 @@ erDiagram
 | `continues_message_id` | VARCHAR(36) | yes |  |
 | `dropped_turns` | INTEGER | yes |  |
 | `error` | TEXT | yes |  |
+| `created_at` | DATETIME | no |  |
+
+## `images`
+
+| Column | Type | Nullable | Notes |
+| --- | --- | --- | --- |
+| `id` | VARCHAR(36) | no | primary key |
+| `message_id` | VARCHAR(36) | no | → messages.id |
+| `conversation_id` | VARCHAR(36) | no |  |
+| `user_id` | VARCHAR(36) | no |  |
+| `prompt` | TEXT | no |  |
+| `image_size` | VARCHAR(32) | no |  |
+| `width` | INTEGER | no |  |
+| `height` | INTEGER | no |  |
+| `seed` | INTEGER | yes |  |
+| `content_type` | VARCHAR(64) | no |  |
+| `size_bytes` | INTEGER | no |  |
+| `path` | VARCHAR(255) | no |  |
+| `job_id` | VARCHAR(36) | yes |  |
+| `orchestrator_url` | VARCHAR(255) | yes |  |
+| `retail_usd` | VARCHAR(64) | yes |  |
+| `wholesale_status` | VARCHAR(24) | yes |  |
+| `wholesale_usd` | VARCHAR(64) | yes |  |
+| `wholesale_updated_at` | DATETIME | yes |  |
+| `expired_at` | DATETIME | yes |  |
 | `created_at` | DATETIME | no |  |

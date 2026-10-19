@@ -147,3 +147,74 @@ async def test_patch_thinking_and_continue_route(client: httpx.AsyncClient, back
     assert events[-1]["message"]["continues_message_id"] == first_id
     detail = await client.get(f"/api/conversations/{conversation_id}")
     assert [m["role"] for m in detail.json()["messages"]] == ["user", "assistant", "assistant"]
+
+
+async def test_image_route_serves_the_owner_only(
+    client: httpx.AsyncClient, application, backend: ScriptedBackend, tmp_path
+) -> None:  # type: ignore[no-untyped-def]
+    from datetime import timedelta
+
+    from chatlpt.adapters.images import LocalImageFiles
+    from chatlpt.contracts import ReplyChunk, ToolCall
+    from chatlpt.services.images import ImageService
+    from chatlpt.testing import ScriptedImageBackend, StaticImagePrices
+
+    class FetchFromMock:
+        """LocalImageFiles with the fetch replaced: no network in tests."""
+
+        def __init__(self) -> None:
+            self.inner = LocalImageFiles(tmp_path / "images")
+
+        async def fetch(self, url: str) -> bytes:
+            return b"\xff\xd8\xffJPEG"
+
+        def save(self, image_id, content_type, data):  # type: ignore[no-untyped-def]
+            return self.inner.save(image_id, content_type, data)
+
+        def path(self, relative: str) -> str:
+            return self.inner.path(relative)
+
+        def delete(self, relative: str) -> None:
+            self.inner.delete(relative)
+
+    application.images = ImageService(
+        ScriptedImageBackend(),
+        FetchFromMock(),
+        application.store,
+        application.store,
+        StaticImagePrices(),
+        application.clock,
+        retention=timedelta(days=30),
+    )
+    application.chat._images = application.images
+    await signup(client, "alice@example.com")
+    conversation_id = (await client.post("/api/conversations")).json()["id"]
+    assert (await client.get("/api/model")).json()["images_available"] is True
+    backend.scripts = [
+        [
+            ReplyChunk(
+                kind="tool_call", tool_call=ToolCall(id="c", name="generate_image", arguments={"prompt": "p"})
+            ),
+            ReplyChunk(kind="done", finish_reason="tool_calls"),
+        ],
+        [ReplyChunk(kind="content", text="caption"), ReplyChunk(kind="done", finish_reason="stop")],
+    ]
+    async with client.stream(
+        "POST", f"/api/conversations/{conversation_id}/messages", json={"content": "draw"}
+    ) as stream:
+        frames = (await stream.aread()).decode().strip().split("\n\n")
+    events = [json.loads(f.split("\ndata: ", 1)[1]) for f in frames]
+    assert [e["type"] for e in events] == ["start", "tool_call", "image", "done", "start", "content", "done"]
+    image_id = events[2]["image"]["id"]
+    served = await client.get(f"/api/images/{image_id}")
+    assert (
+        served.status_code == 200
+        and served.content.startswith(b"\xff\xd8")
+        and served.headers["content-type"] == "image/jpeg"
+    )
+    detail = await client.get(f"/api/conversations/{conversation_id}")
+    kinds = [(m["kind"], len(m["images"])) for m in detail.json()["messages"]]
+    assert kinds == [("text", 0), ("tool_call", 1), ("text", 0)]
+    await client.post("/api/auth/logout")
+    await signup(client, "bob@example.com")
+    assert (await client.get(f"/api/images/{image_id}")).status_code == 404

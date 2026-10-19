@@ -10,7 +10,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 from chatlpt.contracts import (
@@ -39,6 +39,8 @@ class ModelOut(BaseModel):
     app: str
     chat_available: bool
     reason: str | None
+    images_available: bool = False
+    image_app: str | None = None
     model: ModelInfo | None
     prices: PriceTable
 
@@ -66,6 +68,8 @@ def chat_router(app: Application, current_user: Callable[[Request], Awaitable[Us
             reason=reason,
             model=await app.context.model(app.settings.chat_app),
             prices=app.billing_prices(),
+            images_available=app.images.available,
+            image_app=app.settings.image_app if app.settings.tools_enabled else None,
         )
 
     @router.get("/conversations", response_model=list[Conversation])
@@ -128,6 +132,14 @@ def chat_router(app: Application, current_user: Callable[[Request], Awaitable[Us
             events(),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    @router.get("/images/{image_id}", include_in_schema=False)
+    async def image(image_id: UUID, user: Current) -> FileResponse:
+        found, path = await app.images.open(user, image_id)
+        await app.conversations.get(user, found.conversation_id)  # the owner only; others get 404
+        return FileResponse(
+            path, media_type=found.content_type, headers={"Cache-Control": "private, max-age=86400"}
         )
 
     @router.get("/usage/me", response_model=UsageTotals)

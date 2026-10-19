@@ -43,6 +43,11 @@ coding agents.
   model's own `max_model_len` (D14). The system prompt, temperature and output cap are settings.
 - Users can rename and delete conversations. Deleting removes the messages; usage records remain.
 
+- **Images are model-driven** (D25): the assistant is offered a `generate_image` tool and decides when
+  to draw; the app runs `comfystream/fal-flux-schnell` through the engine, stores the file on the
+  volume for `CHATLPT_IMAGE_RETENTION_DAYS`, and the model captions it. Images render inline with
+  prompt, size, retail (fal's list price per megapixel) and network cost. No image button.
+
 ### Usage and cost
 
 Every assistant message records, and the UI shows:
@@ -68,7 +73,7 @@ Every assistant message records, and the UI shows:
 
 - GitHub CI and the agent review loop.
 - Per-user token or dollar quotas.
-- Tool calling, file uploads, image input.
+- File uploads, image input, image editing.
 - More models as orchestrators advertise them.
 
 ## Constraints
