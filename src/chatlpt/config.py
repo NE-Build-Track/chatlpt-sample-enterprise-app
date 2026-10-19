@@ -47,7 +47,8 @@ class Settings(Contract):
     # D8: only runners on these orchestrators are offered to the engine (comma-separated URLs)
     approved_orchestrators: str = (
         "https://orch-us-central.xodeapp.xyz:18935,https://us-central-metrics.speedybird.xyz:28935,"
-        "https://orch-eu-central.open-pool.com:443,https://hky.eliteencoder.net:8936"
+        "https://orch-eu-central.open-pool.com:443,https://hky.eliteencoder.net:8936,"
+        "https://ai1.eliteencoder.net:8936"
     )
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
     temperature: Decimal = Field(default=Decimal("0.7"), ge=0, le=2)

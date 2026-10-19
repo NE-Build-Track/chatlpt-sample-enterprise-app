@@ -8,7 +8,8 @@ observed. Re-check before relying on one.
 | [builder-engine.md](builder-engine.md) | What ChatLPT uses from `livepeer-builder` v0.1.0 in embedded mode |
 | [qwen-runner.md](qwen-runner.md) | The `blueclaw/chat/qwen3.8-27b` vLLM runner: endpoints, streaming, usage, reasoning |
 | [qwen-pricing.md](qwen-pricing.md) | Alibaba Cloud list prices used for the retail book |
+| [fal-pricing.md](fal-pricing.md) | fal.ai list price for FLUX.1 [schnell], the retail book for images |
 | [orchestrators.md](orchestrators.md) | The approved orchestrators and what they advertise |
 | [payment-stack.md](payment-stack.md) | Clearinghouse Batteries and the node remote signer: pins, config, bootstrap |
 | [harness-engineering.md](harness-engineering.md) | The approach this repository follows, and where it came from |
-| [evidence/](evidence/) | Dated runtime evidence: [2026-10-19 first paid replies](evidence/2026-10-19-first-paid-replies.md), [2026-10-19 streamed replies](evidence/2026-10-19-streamed-replies.md) |
+| [evidence/](evidence/) | Dated runtime evidence: [2026-10-19 first paid replies](evidence/2026-10-19-first-paid-replies.md), [2026-10-19 streamed replies](evidence/2026-10-19-streamed-replies.md), [2026-10-19 model-driven images](evidence/2026-10-19-model-driven-images.md) |

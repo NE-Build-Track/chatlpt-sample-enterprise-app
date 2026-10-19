@@ -14,6 +14,7 @@ Orchestrators = [
   "https://us-central-metrics.speedybird.xyz:28935",
   "https://orch-eu-central.open-pool.com:443",
   "https://hky.eliteencoder.net:8936",
+  "https://ai1.eliteencoder.net:8936",
 ]
 DiscoveryGrants = []
 

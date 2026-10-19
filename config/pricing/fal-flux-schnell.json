@@ -1,0 +1,11 @@
+{
+  "model": "fal-ai/flux/schnell",
+  "vendor": "fal.ai",
+  "region": "global",
+  "currency": "USD",
+  "unit": "megapixel",
+  "price_per_unit": "0.003",
+  "rounding": "up to the nearest megapixel",
+  "source_url": "https://fal.ai/models/fal-ai/flux/schnell",
+  "observed_at": "2026-10-19T00:00:00Z"
+}
