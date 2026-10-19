@@ -11,8 +11,8 @@ acceptance checks pass, in the same commit. Known shortcuts go to
 
 | Plan | Goal | Status |
 | --- | --- | --- |
-| [plan-01-foundation](exec-plans/active/plan-01-foundation.md) | Repository map, docs, decisions, scaffold of backend, UI, deploy and checks | active |
-| plan-02-payments-stack | Compose with Batteries, signer and the shared allocation; first paid reply end to end | next |
+| [plan-01-foundation](exec-plans/completed/plan-01-foundation.md) | Repository map, docs, decisions, scaffold of backend, UI, deploy and checks | completed 2026-10-19 |
+| [plan-02-payments-stack](exec-plans/active/plan-02-payments-stack.md) | Compose with Batteries, signer and the shared allocation; first paid reply end to end | active |
 | plan-03-accounts | Email/password, Google, GitHub, sessions, admin list | next |
 | plan-04-chat-and-billing | Conversations, replies, context window, two books, admin page | next |
 | plan-05-engine-streaming (builder-core) | `tasks/m3/mz/stream-support`: contract, transport, REST, tests | parallel with 02–04 |

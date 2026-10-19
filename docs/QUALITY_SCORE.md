@@ -15,7 +15,7 @@ debt), B (tested, minor debt), C (works, gaps), D (scaffold), – (not started).
 | Store and migrations | B | Contract suite runs on SQLite and the in-memory fake; migration drift test |
 | HTTP and SSE | B | Routes, CSRF, ownership and the SSE frame format tested |
 | UI | C | Builds, typed, zod at the boundary; only the money formatting is unit-tested; no browser test yet |
-| Deploy and images | D | Compose validates; images build; the stack has not run end to end (plan-02) |
+| Deploy and images | C | Compose validates; all three images build and the app image runs read-only; the stack has not run end to end (plan-02) |
 | Streaming (builder-core) | – | plan-05 |
 
 ## Test coverage

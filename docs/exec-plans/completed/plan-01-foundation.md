@@ -26,7 +26,7 @@ Working sign-in, a paid reply, billing. Those are plans 02 to 04.
 - [x] `uv run pytest`, `uv run ruff check .`, `uv run mypy`, `uv run python scripts/check_docs.py` pass.
 - [x] `uv run chatlpt serve` answers `GET /readyz` with the engine not configured (degraded, honest).
 - [x] `cd web && pnpm build` produces `web/dist`, and the server serves it.
-- [ ] `scripts/build-images.sh` builds the three images locally without pushing.
+- [x] `scripts/build-images.sh` builds the three images locally without pushing.
 - [x] `docker compose -f deploy/compose.yaml config` validates.
 
 ## Progress
@@ -35,7 +35,8 @@ Working sign-in, a paid reply, billing. Those are plans 02 to 04.
 - 2026-10-19: every layer exists and is wired. Accounts (email/password, provider sign-in), conversations, the
   reply pipeline with both books, the context-window derivation, the admin page and the React UI are
   implemented against the in-memory and SQLite stores; 322 tests pass (unit, store contract, HTTP). The server
-  boots degraded without the payment stack and serves the built UI. What plan-01 did **not** do: run a paid
+  boots degraded without the payment stack and serves the built UI. All three images build; the app image
+  runs read-only as uid 10001 and answers `/readyz`. Coverage 97%, floor ratcheted to 95%. Plan complete. What plan-01 did **not** do: run a paid
   reply (plan-02), configure a provider (plan-03), or verify the UI against a live engine (plan-04).
 
 ## Decision log
