@@ -221,3 +221,20 @@ async def test_image_route_serves_the_owner_only(
     await client.post("/api/auth/logout")
     await signup(client, "bob@example.com")
     assert (await client.get(f"/api/images/{image_id}")).status_code == 404
+
+
+async def test_clearing_history_by_age_or_all(client: httpx.AsyncClient, application: Application) -> None:
+    await signup(client, "hist@example.com")
+    ids = [(await client.post("/api/conversations")).json()["id"] for _ in range(3)]
+    assert (await client.delete("/api/conversations")).status_code == 400  # say which
+    assert (
+        await client.delete("/api/conversations", params={"older_than_days": 30, "all": True})
+    ).status_code == 400
+    application.clock.advance(days=45)  # type: ignore[attr-defined]
+    fresh = (await client.post("/api/conversations")).json()["id"]
+    old = await client.delete("/api/conversations", params={"older_than_days": 30})
+    assert old.json() == {"deleted": 3}
+    remaining = [c["id"] for c in (await client.get("/api/conversations")).json()]
+    assert remaining == [fresh] and not set(ids) & set(remaining)
+    assert (await client.delete("/api/conversations", params={"all": True})).json() == {"deleted": 1}
+    assert (await client.get("/api/conversations")).json() == []

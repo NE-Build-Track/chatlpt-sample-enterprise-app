@@ -61,6 +61,19 @@ export function useDeleteConversation() {
   });
 }
 
+export function useClearHistory() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (olderThanDays: number | null) =>
+      request(
+        z.object({ deleted: z.number() }),
+        olderThanDays === null ? "/api/conversations?all=true" : `/api/conversations?older_than_days=${olderThanDays}`,
+        { method: "DELETE" },
+      ),
+    onSuccess: () => client.invalidateQueries({ queryKey: conversationKeys.all }),
+  });
+}
+
 export function useModel() {
   return useQuery({ queryKey: ["model"], queryFn: () => request(ModelOut, "/api/model"), staleTime: 30_000 });
 }

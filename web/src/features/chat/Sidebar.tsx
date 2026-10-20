@@ -1,13 +1,15 @@
 import { Link, NavLink, useNavigate, useParams } from "react-router";
-import { MoreHorizontal, Pencil, Plus, Shield, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { BarChart3, History, LogOut, MoreHorizontal, Pencil, Plus, Shield, Trash2 } from "lucide-react";
 import { useMe, useLogout } from "@/api/auth";
-import { useConversations, useDeleteConversation, useRenameConversation, useMyUsage } from "@/api/conversations";
+import { useConversations, useDeleteConversation, useRenameConversation } from "@/api/conversations";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { formatMoney, networkSpent } from "@/features/usage/format";
+import { UsageDialog } from "@/features/usage/UsageDialog";
 import { cn } from "@/lib/utils";
+import { ClearHistoryDialog } from "./ClearHistoryDialog";
 
 function groupLabel(iso: string): string {
   const date = new Date(iso);
@@ -20,7 +22,8 @@ function groupLabel(iso: string): string {
   return "Older";
 }
 
-export function Sidebar() {
+// ``onNavigate`` lets the mobile drawer close when the person picks a chat or starts a new one.
+export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const me = useMe();
   const logout = useLogout();
   const navigate = useNavigate();
@@ -28,7 +31,8 @@ export function Sidebar() {
   const conversations = useConversations();
   const rename = useRenameConversation();
   const remove = useDeleteConversation();
-  const usage = useMyUsage();
+  const [usageOpen, setUsageOpen] = useState(false);
+  const [clearOpen, setClearOpen] = useState(false);
 
   const groups = new Map<string, typeof conversations.data>();
   for (const c of conversations.data ?? []) {
@@ -38,6 +42,7 @@ export function Sidebar() {
 
   function onNew() {
     navigate("/"); // the welcome screen; the conversation is created with its first message
+    onNavigate?.();
   }
 
   async function onRename(id: string, current: string) {
@@ -73,6 +78,7 @@ export function Sidebar() {
                     )
                   }
                   title={c.title}
+                  onClick={onNavigate}
                 >
                   {c.title}
                 </NavLink>
@@ -80,7 +86,8 @@ export function Sidebar() {
                   <DropdownMenuTrigger asChild>
                     <button
                       aria-label="Conversation actions"
-                      className="absolute right-1 top-1 rounded p-1 opacity-0 group-hover:opacity-100 focus:opacity-100 data-[state=open]:opacity-100 hover:bg-sidebar-accent"
+                      // Always visible on touch screens and on the open chat; elsewhere on hover.
+                      className="absolute right-1 top-1 rounded p-1 opacity-0 group-hover:opacity-100 group-has-[[aria-current=page]]:opacity-100 focus:opacity-100 data-[state=open]:opacity-100 hover:bg-sidebar-accent [@media(hover:none)]:opacity-100"
                     >
                       <MoreHorizontal className="size-4" />
                     </button>
@@ -101,12 +108,6 @@ export function Sidebar() {
         {conversations.data?.length === 0 && <p className="px-2 py-4 text-xs text-muted-foreground">No conversations yet.</p>}
       </ScrollArea>
       <div className="border-t p-2">
-        {usage.data && (
-          <div className="mb-2 px-2 text-xs text-muted-foreground" title="This month: retail at list price vs. what the Livepeer network charged">
-            This month · retail {formatMoney(usage.data.retail, { compact: true })} · network {formatMoney(networkSpent(usage.data), { compact: true })}
-            {usage.data.wholesale_pending > 0 && ` (+${usage.data.wholesale_pending} pending)`}
-          </div>
-        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-sidebar-accent">
@@ -118,16 +119,26 @@ export function Sidebar() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
             <div className="px-2 py-1.5 text-xs text-muted-foreground truncate">{me.data?.email}</div>
+            <DropdownMenuItem onSelect={() => setUsageOpen(true)}>
+              <BarChart3 className="size-4" /> Usage
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setClearOpen(true)}>
+              <History className="size-4" /> Delete chats…
+            </DropdownMenuItem>
             {me.data?.is_admin && (
               <DropdownMenuItem asChild>
-                <Link to="/admin">
+                <Link to="/admin" onClick={onNavigate}>
                   <Shield className="size-4" /> Admin
                 </Link>
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem onClick={() => void logout()}>Log out</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => void logout()}>
+              <LogOut className="size-4" /> Log out
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <UsageDialog open={usageOpen} onOpenChange={setUsageOpen} />
+        <ClearHistoryDialog open={clearOpen} onOpenChange={setClearOpen} />
       </div>
     </div>
   );

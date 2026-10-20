@@ -177,6 +177,19 @@
         "title": "ConversationOut",
         "type": "object"
       },
+      "Deleted": {
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deleted"
+        ],
+        "title": "Deleted",
+        "type": "object"
+      },
       "DisabledBody": {
         "properties": {
           "disabled": {
@@ -1476,6 +1489,66 @@
       }
     },
     "/api/conversations": {
+      "delete": {
+        "description": "Clear history: chats last active more than ``older_than_days`` ago, or ``all=true``.",
+        "operationId": "delete_many_api_conversations_delete",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "older_than_days",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 3650,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Older Than Days"
+            }
+          },
+          {
+            "in": "query",
+            "name": "all",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "All",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deleted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Many",
+        "tags": [
+          "chat"
+        ]
+      },
       "get": {
         "operationId": "list_conversations_api_conversations_get",
         "responses": {

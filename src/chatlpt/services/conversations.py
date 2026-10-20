@@ -1,5 +1,6 @@
 """Conversation rules: ownership, titles, listing and deletion (docs/product-specs/chatlpt.md#chat)."""
 
+from datetime import timedelta
 from uuid import UUID
 
 from chatlpt.contracts import Conversation, Message, ThinkingLevel, User
@@ -61,6 +62,21 @@ class ConversationService:
     async def delete(self, user: User, conversation_id: UUID) -> None:
         conversation = await self.get(user, conversation_id)
         await self._store.delete_conversation(conversation.id)
+
+    async def delete_older(self, user: User, older_than: timedelta | None) -> int:
+        """Delete this user's conversations last active before ``now - older_than`` (all when None).
+
+        Like a single delete, messages go and the usage ledger stays, so the books are unchanged.
+        """
+        cutoff = None if older_than is None else self._clock.now() - older_than
+        doomed = [
+            c
+            for c in await self._store.list_conversations(user.id, limit=1_000_000)
+            if cutoff is None or c.updated_at < cutoff
+        ]
+        for conversation in doomed:
+            await self._store.delete_conversation(conversation.id)
+        return len(doomed)
 
     async def messages(self, user: User, conversation_id: UUID) -> list[Message]:
         conversation = await self.get(user, conversation_id)

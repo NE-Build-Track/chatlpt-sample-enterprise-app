@@ -5,11 +5,11 @@ See ARCHITECTURE.md#a-reply-end-to-end.
 
 import json
 from collections.abc import AsyncIterator, Awaitable, Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -33,6 +33,10 @@ class ConversationOut(BaseModel):
     conversation: Conversation
     messages: list[Message]
     totals: UsageTotals
+
+
+class Deleted(BaseModel):
+    deleted: int
 
 
 class ModelOut(BaseModel):
@@ -103,6 +107,18 @@ def chat_router(app: Application, current_user: Callable[[Request], Awaitable[Us
         if body.thinking is not None:
             conversation = await app.conversations.set_thinking(user, conversation_id, body.thinking)
         return conversation
+
+    @router.delete("/conversations", response_model=Deleted)
+    async def delete_many(
+        user: Current,
+        older_than_days: Annotated[int | None, Query(ge=1, le=3650)] = None,
+        all: bool = False,
+    ) -> Deleted:
+        """Clear history: chats last active more than ``older_than_days`` ago, or ``all=true``."""
+        if (older_than_days is None) == (not all):
+            raise InvalidRequest("pass older_than_days, or all=true")
+        older = None if all else timedelta(days=older_than_days or 0)
+        return Deleted(deleted=await app.conversations.delete_older(user, older))
 
     @router.delete("/conversations/{conversation_id}", status_code=204)
     async def delete(conversation_id: UUID, user: Current) -> None:
