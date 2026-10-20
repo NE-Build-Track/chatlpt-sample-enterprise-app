@@ -1,7 +1,7 @@
 # Runtime evidence: streamed replies through the deployed app, 19 October 2026
 
 Plan [06](../../exec-plans/completed/plan-06-streaming-adapter.md). The deployed ChatLPT (commit after
-`9672b02`, image rebuilt) runs the engine from builder-core branch `tasks/m3/mz/stream-support` at
+`5771221`, image rebuilt) runs the engine from builder-core branch `tasks/m3/mz/stream-support` at
 `973ac57` (vendored as a wheel at the time; now a git pin). Same payment stack as the [first paid replies](2026-10-19-first-paid-replies.md).
 
 ## One reply, timed from the browser's point of view

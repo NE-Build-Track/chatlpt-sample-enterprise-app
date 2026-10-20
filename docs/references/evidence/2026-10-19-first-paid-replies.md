@@ -2,7 +2,7 @@
 
 Plan [02](../../exec-plans/completed/plan-02-payments-stack.md). Everything ran from `deploy/compose.yaml`
 on the developer's machine: Clearinghouse Batteries `ca09e47`, node signer `406b248` (v1.0.2), and
-ChatLPT at commit `3d3a484` plus the fixes recorded below, embedding livepeer-builder `v0.1.0`.
+ChatLPT at commit `12f35e4` plus the fixes recorded below, embedding livepeer-builder `v0.1.0`.
 
 | Component | Identity |
 | --- | --- |
