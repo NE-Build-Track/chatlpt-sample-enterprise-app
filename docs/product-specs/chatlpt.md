@@ -24,10 +24,12 @@ coding agents.
   is open (D5).
 - **Sign in with Google** (OpenID Connect) and **Sign in with GitHub** (OAuth 2.0; the app reads the
   verified primary email from GitHub's API). Each appears only when its client id and secret are
-  configured. Accounts link by verified email (D6).
+  configured (D6, D27). A provider sign-in links only into an account whose email a provider
+  verified. If a password account already uses that email, the person enters its password to keep
+  it, or continues with a new account, which retires the old one (D26).
 - Sessions are signed, HTTP-only cookies. The browser never holds an engine, payment or admin
   credential.
-- Users listed in `CHATLPT_ADMIN_EMAILS` are admins (D7).
+- Admins are made with `chatlpt make-admin EMAIL`; signing up never makes an admin (D26).
 
 ### Chat
 

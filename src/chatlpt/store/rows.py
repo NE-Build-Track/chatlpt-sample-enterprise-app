@@ -46,6 +46,7 @@ def user_from(row: Mapping[Any, Any]) -> User:
         is_admin=bool(row["is_admin"]),
         disabled=bool(row["disabled"]),
         created_at=utc(row["created_at"]),
+        email_verified=bool(row["email_verified"]),
     )
 
 

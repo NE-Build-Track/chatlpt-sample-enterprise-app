@@ -4,6 +4,7 @@ import json
 
 import httpx
 
+from chatlpt.runtime import Application
 from chatlpt.testing import ScriptedBackend
 from tests.http.conftest import signup
 
@@ -86,11 +87,13 @@ async def test_model_endpoint_reports_availability_and_prices(
     assert (await client.get("/api/model")).json()["reason"] == "stale discovery"
 
 
-async def test_admin_routes_require_an_admin(client: httpx.AsyncClient) -> None:
+async def test_admin_routes_require_an_admin(client: httpx.AsyncClient, application: Application) -> None:
     await signup(client, "alice@example.com")
     assert (await client.get("/api/admin/users")).status_code == 403
     await client.post("/api/auth/logout")
     admin = await signup(client, "admin@example.com")
+    assert (await client.get("/api/admin/users")).status_code == 403  # signing up never makes an admin
+    await application.auth.set_admin("admin@example.com", True, allow_unverified=True)  # `chatlpt make-admin`
     rows = await client.get("/api/admin/users")
     assert rows.status_code == 200 and {r["user"]["email"] for r in rows.json()} == {
         "alice@example.com",

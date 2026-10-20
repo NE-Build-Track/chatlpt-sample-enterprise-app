@@ -1,6 +1,7 @@
 """The operator CLI: secrets, migrations, revisions, generated docs and the smoke check."""
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -24,9 +25,9 @@ def test_migrate_revision_and_smoke(
     monkeypatch.delenv("LPB_SIGNER_URL", raising=False)
     monkeypatch.delenv("LPB_DISCOVERY_URL", raising=False)
     assert main(["migrate"]) == 0
-    assert json.loads(capsys.readouterr().out)["revision"] == "0004"
+    assert json.loads(capsys.readouterr().out)["revision"] == "0001"
     assert main(["revision"]) == 0
-    assert json.loads(capsys.readouterr().out) == {"database": "0004", "package": "0004"}
+    assert json.loads(capsys.readouterr().out) == {"database": "0001", "package": "0001"}
     assert main(["smoke"]) == 0
     assert json.loads(capsys.readouterr().out)["ready"] is True
 
@@ -47,3 +48,42 @@ def test_app_errors_exit_one(monkeypatch: pytest.MonkeyPatch, capsys: pytest.Cap
     monkeypatch.delenv("LPB_SIGNER_URL", raising=False)
     assert main(["smoke"]) == 1
     assert "pricing file" in capsys.readouterr().err
+
+
+def test_make_admin_refuses_an_unverified_email_unless_told(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import asyncio
+    from uuid import uuid4
+
+    from chatlpt.contracts import User
+    from chatlpt.store import SqlStore
+
+    url = f"sqlite+aiosqlite:///{tmp_path}/admins.db"
+    monkeypatch.setenv("CHATLPT_DATABASE_URL", url)
+
+    async def seed() -> None:
+        store = await SqlStore.connect(url)
+        now = datetime.now(UTC)
+        for email, verified in (("pw@example.com", False), ("g@example.com", True)):
+            await store.create_user(
+                User(id=uuid4(), email=email, display_name="x", is_admin=False, disabled=False,
+                     created_at=now, email_verified=verified),
+                None,
+            )  # fmt: skip
+        await store.close()
+
+    asyncio.run(seed())
+    assert main(["make-admin", "pw@example.com"]) == 1
+    assert "not verified" in capsys.readouterr().err
+    assert main(["make-admin", "pw@example.com", "--allow-unverified"]) == 0
+    assert json.loads(capsys.readouterr().out)["is_admin"] is True
+    assert main(["make-admin", "g@example.com"]) == 0
+    assert json.loads(capsys.readouterr().out) == {
+        "email": "g@example.com",
+        "is_admin": True,
+        "email_verified": True,
+    }
+    assert main(["revoke-admin", "g@example.com"]) == 0
+    assert json.loads(capsys.readouterr().out)["is_admin"] is False
+    assert main(["make-admin", "nobody@example.com"]) == 1

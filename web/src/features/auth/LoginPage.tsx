@@ -7,16 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthShell } from "./AuthShell";
+import { localPath, signInError } from "./paths";
 
 export function LoginPage() {
   const [params] = useSearchParams();
-  const next = params.get("next") ?? "/";
+  const next = localPath(params.get("next"));
   const navigate = useNavigate();
   const client = useQueryClient();
   const providers = useProviders();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(signInError(params.get("error")));
   const [busy, setBusy] = useState(false);
 
   async function submit(event: FormEvent) {
@@ -26,7 +27,7 @@ export function LoginPage() {
     try {
       const user = await login(email, password);
       client.setQueryData(["me"], user);
-      navigate(next.startsWith("/") ? next : "/", { replace: true });
+      navigate(next, { replace: true });
     } catch (e) {
       setError(e instanceof HttpError ? e.message : "sign-in failed");
     } finally {

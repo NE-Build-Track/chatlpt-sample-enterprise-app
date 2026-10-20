@@ -1,20 +1,24 @@
 """``create_app``: routes, error mapping, health, and the static React bundle with SPA fallback."""
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from chatlpt.contracts import AppHealth
-from chatlpt.errors import AppError, ChatUnavailable
+from chatlpt.errors import AppError, ChatUnavailable, TooManyAttempts
 from chatlpt.http.routes_admin import admin_router
-from chatlpt.http.routes_auth import auth_router
+from chatlpt.http.routes_auth import auth_router, oauth_redirect_uris
 from chatlpt.http.routes_chat import chat_router
 from chatlpt.http.sessions import Sessions, current_user_dependency
 from chatlpt.runtime import Application, package_version
+
+_LOG = logging.getLogger(__name__)
 
 
 def create_app(app: Application, *, manage_lifecycle: bool = True) -> FastAPI:
@@ -27,6 +31,12 @@ def create_app(app: Application, *, manage_lifecycle: bool = True) -> FastAPI:
         secure=app.settings.secure_cookies,
     )
     current_user = current_user_dependency(app, sessions)
+    if app.oauth:
+        _check_public_base_url(app.settings.public_base_url)
+        _LOG.info(
+            "register these OAuth redirect URIs with each provider",
+            extra={"event": "auth.oauth_redirects", "redirect_uris": oauth_redirect_uris(app)},
+        )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -57,10 +67,22 @@ def create_app(app: Application, *, manage_lifecycle: bool = True) -> FastAPI:
     return api
 
 
+def _check_public_base_url(url: str) -> None:
+    """OAuth callbacks are built from CHATLPT_PUBLIC_BASE_URL and must match what the providers have."""
+    parts = urlsplit(url)
+    local = parts.hostname in ("localhost", "127.0.0.1", "::1")
+    if (parts.scheme != "https" and not (parts.scheme == "http" and local)) or not parts.hostname:
+        raise AppError(
+            f"CHATLPT_PUBLIC_BASE_URL={url!r} cannot carry Google or GitHub sign-in: use the https URL "
+            "people open (http only on localhost). See docs/RELIABILITY.md#sign-in-with-google-and-github"
+        )
+
+
 def _install_error_handlers(api: FastAPI) -> None:
     @api.exception_handler(AppError)
     async def app_error(_: Request, exc: AppError) -> JSONResponse:
-        headers = {"Retry-After": str(exc.retry_after_s)} if isinstance(exc, ChatUnavailable) else None
+        retry = isinstance(exc, ChatUnavailable | TooManyAttempts)
+        headers = {"Retry-After": str(exc.retry_after_s)} if retry else None  # type: ignore[attr-defined]
         return JSONResponse(
             {"error": str(exc), "type": type(exc).__name__}, status_code=exc.status_code, headers=headers
         )

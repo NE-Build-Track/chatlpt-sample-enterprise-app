@@ -1,17 +1,20 @@
-"""Sign in with Google (OpenID Connect) and GitHub (OAuth 2.0), D6. The only module importing authlib/httpx.
+"""Sign in with Google and GitHub (authorization code with PKCE), D6, D26. The only module importing authlib.
 
-Both providers return a verified email. Google's comes from its OIDC userinfo endpoint, called with the
-access token just obtained over TLS. GitHub has no identity token, so the primary verified email is read
-from ``/user/emails``.
+Both providers return a verified email. Google's comes from its OIDC userinfo endpoint and GitHub's from
+``/user/emails`` (the primary verified address), each called with the access token just obtained from the
+provider's token endpoint over TLS with our client secret. No ``id_token`` is used, so there is no nonce
+to check. Every provider or network failure becomes NotAuthenticated, so the HTTP layer can send the
+person back to the login page with a plain message.
 """
 
 from typing import Any
 
 import httpx
+from authlib.integrations.base_client.errors import OAuthError
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 
 from chatlpt.contracts import OAuthIdentity, OAuthProviderName
-from chatlpt.errors import NotAuthenticated
+from chatlpt.errors import NotAuthenticated, UnverifiedEmail
 
 GOOGLE_AUTH = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN = "https://oauth2.googleapis.com/token"  # noqa: S105  (an endpoint, not a credential)
@@ -39,17 +42,38 @@ class _Provider:
 
     def _client(self, redirect_uri: str) -> AsyncOAuth2Client:
         return AsyncOAuth2Client(
-            self._client_id, self._client_secret, scope=self.scope, redirect_uri=redirect_uri
+            self._client_id,
+            self._client_secret,
+            scope=self.scope,
+            redirect_uri=redirect_uri,
+            code_challenge_method="S256",
+            transport=self._transport,
         )
 
-    def authorization_url(self, redirect_uri: str, state: str, nonce: str) -> str:
-        url, _ = self._client(redirect_uri).create_authorization_url(self.auth_url, state=state, nonce=nonce)
+    def authorization_url(self, redirect_uri: str, state: str, code_verifier: str) -> str:
+        url, _ = self._client(redirect_uri).create_authorization_url(
+            self.auth_url, state=state, code_verifier=code_verifier
+        )
         return str(url)
 
-    async def _token(self, redirect_uri: str, code: str) -> dict[str, Any]:
+    async def exchange(self, redirect_uri: str, code: str, code_verifier: str) -> OAuthIdentity:
+        try:
+            token = await self._token(redirect_uri, code, code_verifier)
+            return await self._identity(token["access_token"])
+        except (OAuthError, httpx.HTTPError, ValueError, KeyError) as exc:
+            raise NotAuthenticated(f"{self.name} sign-in failed: {type(exc).__name__}") from exc
+
+    async def _identity(self, access_token: str) -> OAuthIdentity:
+        raise NotImplementedError
+
+    async def _token(self, redirect_uri: str, code: str, code_verifier: str) -> dict[str, Any]:
         async with self._client(redirect_uri) as client:
             token = await client.fetch_token(
-                self.token_url, code=code, redirect_uri=redirect_uri, headers={"Accept": "application/json"}
+                self.token_url,
+                code=code,
+                redirect_uri=redirect_uri,
+                code_verifier=code_verifier,
+                headers={"Accept": "application/json"},
             )
         access = token.get("access_token")
         if not isinstance(access, str) or not access:
@@ -63,17 +87,14 @@ class GoogleProvider(_Provider):
     token_url = GOOGLE_TOKEN
     scope = "openid email profile"
 
-    async def exchange(self, redirect_uri: str, code: str, nonce: str) -> OAuthIdentity:
-        token = await self._token(redirect_uri, code)
+    async def _identity(self, access_token: str) -> OAuthIdentity:
         async with self._http() as http:
-            response = await http.get(
-                GOOGLE_USERINFO, headers={"Authorization": f"Bearer {token['access_token']}"}
-            )
+            response = await http.get(GOOGLE_USERINFO, headers={"Authorization": f"Bearer {access_token}"})
         if response.status_code != 200:
             raise NotAuthenticated("google userinfo failed")
         info = response.json()
         if not info.get("email_verified") or not info.get("email") or not info.get("sub"):
-            raise NotAuthenticated("google account has no verified email")
+            raise UnverifiedEmail("google account has no verified email")
         return OAuthIdentity(
             provider="google",
             subject=str(info["sub"]),
@@ -88,10 +109,9 @@ class GitHubProvider(_Provider):
     token_url = GITHUB_TOKEN
     scope = "read:user user:email"
 
-    async def exchange(self, redirect_uri: str, code: str, nonce: str) -> OAuthIdentity:
-        token = await self._token(redirect_uri, code)
+    async def _identity(self, access_token: str) -> OAuthIdentity:
         headers = {
-            "Authorization": f"Bearer {token['access_token']}",
+            "Authorization": f"Bearer {access_token}",
             "Accept": "application/vnd.github+json",
         }
         async with self._http(base_url=GITHUB_API) as http:
@@ -103,7 +123,7 @@ class GitHubProvider(_Provider):
             raise NotAuthenticated("github user lookup failed")
         primary = next((e for e in emails.json() if e.get("primary") and e.get("verified")), None)
         if primary is None:
-            raise NotAuthenticated("github account has no verified primary email")
+            raise UnverifiedEmail("github account has no verified primary email")
         profile = user.json()
         return OAuthIdentity(
             provider="github",

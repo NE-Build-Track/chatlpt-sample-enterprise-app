@@ -111,6 +111,7 @@ async def test_sync_wholesale_skips_records_without_jobs_and_tolerates_lookup_er
 
 async def test_admin_edges(application: Application) -> None:
     admin = await application.auth.signup(NewUser(email="admin@example.com", password="correct horse"))
+    admin = await application.auth.set_admin(admin.email, True, allow_unverified=True)
     with pytest.raises(NotFound):
         await application.admin.set_disabled(admin, uuid4(), True)
     with pytest.raises(AccessDenied):
@@ -139,15 +140,18 @@ async def test_context_falls_back_to_a_stale_cache_when_the_model_cannot_be_aske
 async def test_disabled_user_cannot_sign_in_with_a_provider(
     application: Application, store: MemoryStore
 ) -> None:
-    from chatlpt.contracts import OAuthIdentity
+    from chatlpt.contracts import ClaimNeeded, OAuthIdentity
     from chatlpt.errors import NotAuthenticated
 
-    user = await application.auth.signup(NewUser(email="z@example.com", password="correct horse"))
+    identity = OAuthIdentity(provider="github", subject="1", email="z@example.com")
+    user = await application.auth.sign_in_with(identity)  # a verified account
+    assert not isinstance(user, ClaimNeeded)
     await store.set_disabled(user.id, True)
     with pytest.raises(NotAuthenticated):
-        await application.auth.sign_in_with(
-            OAuthIdentity(provider="github", subject="1", email="z@example.com")
-        )
+        await application.auth.sign_in_with(identity)
+    other = identity.model_copy(update={"provider": "google", "subject": "g"})
+    with pytest.raises(NotAuthenticated):  # a verified, disabled account is never claimed
+        await application.auth.sign_in_with(other)
 
 
 async def test_partial_text_survives_a_failure_mid_stream(

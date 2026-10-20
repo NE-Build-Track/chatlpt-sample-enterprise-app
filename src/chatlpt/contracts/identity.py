@@ -14,6 +14,9 @@ from chatlpt.contracts.common import Contract
 OAuthProviderName = Literal["google", "github"]
 
 
+UNCLAIMED_PREFIX = "unclaimed+"  # a retired account's email: unclaimed+<id>@invalid (D26)
+
+
 class User(Contract):
     id: UUID
     email: str
@@ -21,6 +24,14 @@ class User(Contract):
     is_admin: bool
     disabled: bool
     created_at: datetime
+    # True only when Google or GitHub confirmed this email (D26). A password signup is unverified, and a
+    # provider sign-in with the same email claims it.
+    email_verified: bool = False
+
+    @property
+    def unclaimed(self) -> bool:
+        """Retired by a claim: a provider proved someone else owns the address this account used."""
+        return self.email.startswith(UNCLAIMED_PREFIX)
 
 
 class NewUser(Contract):
@@ -43,6 +54,17 @@ class OAuthIdentity(Contract):
     subject: str  # the provider's stable user id
     email: str  # verified by the provider
     display_name: str = ""
+
+
+class ClaimNeeded(Contract):
+    """A provider proved ``identity.email``, but an unverified password account already uses it (D26).
+
+    The person chooses: enter that account's password to keep it (``keep_account``), or continue with a
+    new account, which retires the old one (``claim``).
+    """
+
+    identity: OAuthIdentity
+    account_id: UUID
 
 
 class SessionClaims(Contract):

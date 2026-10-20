@@ -4,26 +4,31 @@ from typing import Any
 
 import httpx
 import pytest
+from authlib.oauth2.rfc7636 import create_s256_code_challenge
 
 from chatlpt.adapters import oauth
 from chatlpt.adapters.oauth import GitHubProvider, GoogleProvider
-from chatlpt.errors import NotAuthenticated
+from chatlpt.errors import NotAuthenticated, UnverifiedEmail
 
 REDIRECT = "http://localhost:3050/api/auth/oauth/google/callback"
 
 
-def test_authorization_url_carries_state_nonce_scope_and_redirect() -> None:
-    url = GoogleProvider("cid", "secret").authorization_url(REDIRECT, "st4te", "n0nce")
+def test_authorization_url_carries_state_pkce_scope_and_redirect() -> None:
+    verifier = "v" * 64
+    url = GoogleProvider("cid", "secret").authorization_url(REDIRECT, "st4te", verifier)
     assert url.startswith(oauth.GOOGLE_AUTH)
-    assert "state=st4te" in url and "nonce=n0nce" in url and "client_id=cid" in url
+    assert "state=st4te" in url and "client_id=cid" in url and "nonce=" not in url
+    challenge = create_s256_code_challenge(verifier)
+    assert f"code_challenge={challenge}" in url and "code_challenge_method=S256" in url
+    assert verifier not in url  # only the challenge travels through the browser
     assert "scope=openid+email+profile" in url and "redirect_uri=http%3A%2F%2Flocalhost%3A3050" in url
     github = GitHubProvider("cid", "secret").authorization_url(REDIRECT, "s", "n")
     assert github.startswith(oauth.GITHUB_AUTH) and "scope=read%3Auser+user%3Aemail" in github
 
 
 async def _patch_token(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def fake_token(self: Any, redirect_uri: str, code: str) -> dict[str, Any]:
-        assert code == "c0de"
+    async def fake_token(self: Any, redirect_uri: str, code: str, code_verifier: str) -> dict[str, Any]:
+        assert code == "c0de" and code_verifier == "n"
         return {"access_token": "tok", "token_type": "bearer"}
 
     monkeypatch.setattr(oauth._Provider, "_token", fake_token)
@@ -51,7 +56,7 @@ async def test_google_rejects_unverified_email(monkeypatch: pytest.MonkeyPatch) 
     transport = httpx.MockTransport(
         lambda _: httpx.Response(200, json={"sub": "g-1", "email": "x@y", "email_verified": False})
     )
-    with pytest.raises(NotAuthenticated):
+    with pytest.raises(UnverifiedEmail):
         await GoogleProvider("cid", "secret", transport=transport).exchange(REDIRECT, "c0de", "n")
     failing = httpx.MockTransport(lambda _: httpx.Response(500))
     with pytest.raises(NotAuthenticated):
@@ -87,7 +92,7 @@ async def test_github_without_a_verified_primary_email_is_refused(monkeypatch: p
             return httpx.Response(200, json={"id": 1, "login": "x"})
         return httpx.Response(200, json=[{"email": "a@b", "primary": True, "verified": False}])
 
-    with pytest.raises(NotAuthenticated):
+    with pytest.raises(UnverifiedEmail):
         await GitHubProvider("cid", "secret", transport=httpx.MockTransport(handler)).exchange(
             REDIRECT, "c0de", "n"
         )
@@ -114,3 +119,24 @@ async def test_missing_access_token_is_refused() -> None:
 
     with pytest.raises(NotAuthenticated):
         await NoToken("cid", "secret").exchange(REDIRECT, "c0de", "n")
+
+
+async def test_the_token_exchange_sends_the_pkce_verifier_and_maps_provider_errors() -> None:
+    sent: dict[str, str] = {}
+
+    def token_endpoint(request: httpx.Request) -> httpx.Response:
+        sent.update(dict(httpx.QueryParams(request.content.decode())))
+        return httpx.Response(400, json={"error": "invalid_grant"})  # e.g. a code used twice
+
+    provider = GoogleProvider("cid", "secret", transport=httpx.MockTransport(token_endpoint))
+    with pytest.raises(NotAuthenticated, match="google sign-in failed"):
+        await provider.exchange(REDIRECT, "c0de", "the-verifier")
+    assert sent["code_verifier"] == "the-verifier" and sent["code"] == "c0de"
+
+    def unreachable(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("no route", request=request)
+
+    with pytest.raises(NotAuthenticated, match="ConnectError"):
+        await GoogleProvider("cid", "secret", transport=httpx.MockTransport(unreachable)).exchange(
+            REDIRECT, "c0de", "v"
+        )

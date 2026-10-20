@@ -12,8 +12,17 @@
 ## Rules
 
 - Passwords: argon2id, per-user salt, never logged. Password reset is out of scope in phase 1.
-- OAuth: state and nonce checked; Google via OIDC `id_token`; GitHub via `/user/emails`, verified
-  primary only. Accounts link by verified email (D6).
+- OAuth (D6, D27): authorization code with PKCE (S256) and a signed `state` cookie (10 minutes).
+  The identity comes from Google's userinfo endpoint (`email_verified` required) and GitHub's
+  `/user/emails` (the verified primary), each called with the access token from the provider's token
+  endpoint. No `id_token` is used, so there is no nonce. Every failure returns to `/login?error=…`.
+- Accounts (D26): a provider sign-in links only into a **verified** account. An unverified password
+  account with the same email is kept only with its password, otherwise claimed (retired). Admin
+  rights come only from `chatlpt make-admin`, never from configuration or signup.
+- Attempt limits (D26): login, signup and the claim prompt allow 5 a minute per email and 20 per
+  client address, in memory. Behind a reverse proxy set `CHATLPT_TRUST_FORWARDED_FOR=true`, or every
+  person shares the proxy's address.
+- Redirects after sign-in go only to paths on this site (`next` is checked server and client side).
 - Sessions: itsdangerous-signed cookie carrying the user id and an expiry; rotated on login.
 - CSRF: same-site cookie plus a custom header on state-changing JSON requests.
 - The engine's `DefaultPolicy` still applies in embedded mode: a user reads only their own jobs.

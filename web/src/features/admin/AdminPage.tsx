@@ -48,7 +48,11 @@ export function AdminPage() {
                   <div className="text-xs text-muted-foreground">{user.email}</div>
                   <div className="mt-1 flex gap-1">
                     {user.is_admin && <Badge variant="secondary">admin</Badge>}
-                    {user.disabled && <Badge variant="destructive">disabled</Badge>}
+                    {user.email.startsWith("unclaimed+") ? (
+                      <Badge variant="outline" title="Retired: a verified sign-in claimed its email (D26)">unclaimed</Badge>
+                    ) : (
+                      user.disabled && <Badge variant="destructive">disabled</Badge>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell className="text-right">{totals?.replies ?? 0}</TableCell>

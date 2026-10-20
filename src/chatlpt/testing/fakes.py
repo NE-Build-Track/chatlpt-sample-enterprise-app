@@ -277,6 +277,18 @@ class MemoryStore:
     async def set_admin(self, user_id: UUID, is_admin: bool) -> None:
         self.users[user_id] = self.users[user_id].model_copy(update={"is_admin": is_admin})
 
+    async def set_email_verified(self, user_id: UUID, verified: bool) -> None:
+        self.users[user_id] = self.users[user_id].model_copy(update={"email_verified": verified})
+
+    async def claim_email(
+        self, retired_id: UUID, placeholder_email: str, new_user: User, identity: OAuthIdentity
+    ) -> None:
+        retired = {"disabled": True, "is_admin": False, "email": placeholder_email}
+        self.users[retired_id] = self.users[retired_id].model_copy(update=retired)
+        self.hashes.pop(retired_id, None)
+        await self.create_user(new_user, None)
+        await self.link_identity(new_user.id, identity)
+
     async def list_users(self) -> list[User]:
         return sorted(self.users.values(), key=lambda u: u.created_at)
 

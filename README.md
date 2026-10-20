@@ -183,7 +183,7 @@ Everything is an environment variable; `deploy/.env.example` lists each with its
 | `CHATLPT_DATABASE_URL` | SQLite URL for the app database |
 | `CHATLPT_PUBLIC_BASE_URL`, `CHATLPT_HTTP_HOST`, `CHATLPT_HTTP_PORT` | Where the app is reached (OAuth callbacks need the base URL) |
 | `CHATLPT_SESSION_SECRET` | Signs session cookies |
-| `CHATLPT_ADMIN_EMAILS` | Comma-separated admins |
+| `CHATLPT_ALLOW_SIGNUP`, `CHATLPT_TRUST_FORWARDED_FOR` | Open signup (default on; close it for a public deployment); rate-limit by `X-Forwarded-For` behind a proxy |
 | `CHATLPT_GOOGLE_CLIENT_ID/SECRET`, `CHATLPT_GITHUB_CLIENT_ID/SECRET` | Enable each sign-in button |
 | `CHATLPT_SYSTEM_PROMPT`, `CHATLPT_TEMPERATURE`, `CHATLPT_MAX_OUTPUT_TOKENS` | Model defaults; the output limit covers answer plus thinking |
 | `CHATLPT_DEFAULT_THINKING`, `CHATLPT_THINKING_BUDGET_LOW/MEDIUM/HIGH` | The per-conversation thinking level and its chain-of-thought caps |

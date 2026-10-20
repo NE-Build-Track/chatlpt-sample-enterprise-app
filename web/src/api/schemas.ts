@@ -11,8 +11,12 @@ export const User = z.object({
   is_admin: z.boolean(),
   disabled: z.boolean(),
   created_at: z.string(),
+  email_verified: z.boolean(),
 });
 export type User = z.infer<typeof User>;
+
+export const ClaimDetails = z.object({ email: z.string(), provider: z.string() });
+export const SignedIn = z.object({ user: User, next: z.string() });
 
 export const TokenUsage = z.object({
   prompt_tokens: z.number(),

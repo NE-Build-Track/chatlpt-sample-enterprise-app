@@ -3,6 +3,7 @@
 import asyncio
 import contextlib
 import logging
+import os
 from datetime import timedelta
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -35,6 +36,7 @@ from chatlpt.services.chat import ChatService
 from chatlpt.services.context import ContextService
 from chatlpt.services.conversations import ConversationService
 from chatlpt.services.images import ImageService
+from chatlpt.services.limits import AttemptLimiter
 from chatlpt.store import SqlStore
 
 _LOG = logging.getLogger(__name__)
@@ -76,9 +78,8 @@ class Application:
             max_output_tokens=settings.max_output_tokens,
             timeout_s=settings.reply_timeout_s,
         )
-        self.auth = AuthService(
-            store, hasher, clock, admin_emails=settings.admin_email_set, allow_signup=settings.allow_signup
-        )
+        self.auth = AuthService(store, hasher, clock, allow_signup=settings.allow_signup)
+        self.attempts = AttemptLimiter(clock)
         self.conversations = ConversationService(store, clock, default_thinking=settings.default_thinking)
         self.context = ContextService(
             backend,
@@ -129,6 +130,11 @@ class Application:
     @classmethod
     async def from_settings(cls, settings: Settings | None = None) -> "Application":
         settings = settings or Settings.from_env()
+        if os.environ.get("CHATLPT_ADMIN_EMAILS"):
+            _LOG.warning(
+                "CHATLPT_ADMIN_EMAILS is no longer read; grant admin with `chatlpt make-admin EMAIL` (D26)",
+                extra={"event": "config.admin_emails_ignored"},
+            )
         clock = SystemClock()
         store = await SqlStore.connect(settings.database_url, migrate=settings.auto_migrate)
         apps = frozenset({settings.chat_app} | ({settings.image_app} if settings.tools_enabled else set()))

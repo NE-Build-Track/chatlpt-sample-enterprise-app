@@ -6,6 +6,8 @@ chatlpt gen-secret         print a new CHATLPT_SESSION_SECRET
 chatlpt smoke              migrate, start, health-check, stop (install check)
 chatlpt serve              run the app (API + static UI)
 chatlpt gen-docs [--check] regenerate docs/generated (openapi.json, db-schema.md)
+chatlpt make-admin EMAIL [--allow-unverified]   grant admin (the only way, D26)
+chatlpt revoke-admin EMAIL                      take admin away
 """
 
 import argparse
@@ -49,6 +51,14 @@ def _parser() -> argparse.ArgumentParser:
     command("gen-secret", _gen_secret, "print a new CHATLPT_SESSION_SECRET")
     command("smoke", _smoke, "migrate/start/health/stop check")
     command("serve", _serve, "run the app")
+    grant = command("make-admin", _make_admin, "grant admin rights to an account (the only way, D26)")
+    grant.add_argument("email")
+    grant.add_argument(
+        "--allow-unverified",
+        action="store_true",
+        help="also for a password-only account, whose email nobody has proven",
+    )
+    command("revoke-admin", _revoke_admin, "take admin rights away").add_argument("email")
     docs = command("gen-docs", _gen_docs, "regenerate docs/generated")
     docs.add_argument("--out", type=Path, default=Path("docs/generated"))
     docs.add_argument("--check", action="store_true", help="fail if the committed files are stale")
@@ -72,6 +82,29 @@ async def _revision(_: argparse.Namespace) -> None:
     store = await SqlStore.connect(Settings.from_env().database_url, migrate=False)
     try:
         _emit({"database": await current_revision(store.engine), "package": head_revision()})
+    finally:
+        await store.close()
+
+
+async def _make_admin(args: argparse.Namespace) -> None:
+    await _set_admin(args.email, True, allow_unverified=args.allow_unverified)
+
+
+async def _revoke_admin(args: argparse.Namespace) -> None:
+    await _set_admin(args.email, False)
+
+
+async def _set_admin(email: str, is_admin: bool, *, allow_unverified: bool = False) -> None:
+    from chatlpt.adapters.clock import SystemClock
+    from chatlpt.adapters.passwords import Argon2Hasher
+    from chatlpt.services.auth import AuthService
+
+    settings = Settings.from_env()
+    store = await SqlStore.connect(settings.database_url, migrate=settings.auto_migrate)
+    try:
+        auth = AuthService(store, Argon2Hasher(), SystemClock(), allow_signup=settings.allow_signup)
+        user = await auth.set_admin(email, is_admin, allow_unverified=allow_unverified)
+        _emit({"email": user.email, "is_admin": user.is_admin, "email_verified": user.email_verified})
     finally:
         await store.close()
 

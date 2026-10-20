@@ -33,6 +33,8 @@ from chatlpt.contracts.chat import (
 from chatlpt.contracts.common import Contract, Currency, Money
 from chatlpt.contracts.health import AppHealth, Check
 from chatlpt.contracts.identity import (
+    UNCLAIMED_PREFIX,
+    ClaimNeeded,
     Login,
     NewUser,
     OAuthIdentity,
@@ -42,11 +44,13 @@ from chatlpt.contracts.identity import (
 )
 
 __all__ = [
+    "UNCLAIMED_PREFIX",
     "AppHealth",
     "ChatParams",
     "ChatTurn",
     "Check",
     "ChunkKind",
+    "ClaimNeeded",
     "Contract",
     "Conversation",
     "Currency",

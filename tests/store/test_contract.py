@@ -47,6 +47,25 @@ async def test_users_identities_and_flags(app_store: AppStore) -> None:
     assert [u.id for u in await app_store.list_users()] == [alice.id]
 
 
+async def test_email_verified_and_a_claim_in_one_step(app_store: AppStore) -> None:
+    squat = user("carol@example.com")
+    await app_store.create_user(squat, "squatters hash")
+    await app_store.set_admin(squat.id, True)
+    assert not (await app_store.user_by_id(squat.id)).email_verified  # type: ignore[union-attr]
+    owner = user("carol@example.com").model_copy(update={"email_verified": True})
+    identity = OAuthIdentity(provider="google", subject="g-carol", email="carol@example.com")
+    await app_store.claim_email(squat.id, f"unclaimed+{squat.id}@invalid", owner, identity)
+    retired = await app_store.user_by_id(squat.id)
+    assert retired is not None and retired.disabled and not retired.is_admin and retired.unclaimed
+    assert await app_store.password_hash(squat.id) is None
+    assert await app_store.user_by_email("carol@example.com") == owner
+    assert await app_store.user_by_identity("google", "g-carol") == owner
+    other = user("dave@example.com")
+    await app_store.create_user(other, None)
+    await app_store.set_email_verified(other.id, True)
+    assert (await app_store.user_by_id(other.id)).email_verified  # type: ignore[union-attr]
+
+
 async def test_conversations_and_messages_round_trip(app_store: AppStore) -> None:
     alice = user()
     await app_store.create_user(alice, None)

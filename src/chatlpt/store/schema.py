@@ -21,6 +21,7 @@ users = Table(
     Column("password_hash", String(255), nullable=True),
     Column("is_admin", Boolean, nullable=False, server_default="0"),
     Column("disabled", Boolean, nullable=False, server_default="0"),
+    Column("email_verified", Boolean, nullable=False, server_default="0"),  # a provider confirmed it (D26)
     Column("created_at", DateTime(timezone=True), nullable=False),
 )
 

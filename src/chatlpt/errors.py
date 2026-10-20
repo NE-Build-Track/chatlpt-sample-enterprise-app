@@ -13,6 +13,18 @@ class NotAuthenticated(AppError):
     status_code = 401
 
 
+class UnverifiedEmail(NotAuthenticated):
+    """The provider has no verified email for this account (D26)."""
+
+
+class AccountDisabled(NotAuthenticated):
+    """The account was disabled by an admin or retired by a claim."""
+
+
+class SignupClosed(NotAuthenticated):
+    """No account for this email, and signup is closed."""
+
+
 class AccessDenied(AppError):
     """Signed in, but not allowed (403)."""
 
@@ -43,6 +55,16 @@ class ChatUnavailable(AppError):
     status_code = 503
 
     def __init__(self, message: str, retry_after_s: int = 10) -> None:
+        super().__init__(message)
+        self.retry_after_s = retry_after_s
+
+
+class TooManyAttempts(AppError):
+    """Too many login, signup or claim attempts from this address or for this email (429, D26)."""
+
+    status_code = 429
+
+    def __init__(self, message: str, retry_after_s: int = 60) -> None:
         super().__init__(message)
         self.retry_after_s = retry_after_s
 

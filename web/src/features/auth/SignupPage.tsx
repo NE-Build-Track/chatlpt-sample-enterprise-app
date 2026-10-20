@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthShell } from "./AuthShell";
+import { localPath } from "./paths";
 
 export function SignupPage() {
   const [params] = useSearchParams();
-  const next = params.get("next") ?? "/";
+  const next = localPath(params.get("next"));
   const navigate = useNavigate();
   const client = useQueryClient();
   const [name, setName] = useState("");
@@ -26,7 +27,7 @@ export function SignupPage() {
     try {
       const user = await signup(email, password, name);
       client.setQueryData(["me"], user);
-      navigate(next.startsWith("/") ? next : "/", { replace: true });
+      navigate(next, { replace: true });
     } catch (e) {
       setError(e instanceof HttpError ? e.message : "sign-up failed");
     } finally {

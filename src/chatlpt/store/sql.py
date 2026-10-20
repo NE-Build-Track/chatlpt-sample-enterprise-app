@@ -62,20 +62,21 @@ class SqlStore:
     # -- users --------------------------------------------------------------------------------------
 
     async def create_user(self, user: User, password_hash: str | None) -> None:
-        values = {
-            "id": str(user.id),
-            "email": user.email.lower(),
-            "display_name": user.display_name,
-            "password_hash": password_hash,
-            "is_admin": user.is_admin,
-            "disabled": user.disabled,
-            "created_at": user.created_at,
-        }
+        values = _user_values(user, password_hash)
         try:
             async with self.engine.begin() as conn:
                 await conn.execute(insert(t.users).values(values))
         except IntegrityError as exc:
             raise Conflict("an account with that email already exists") from exc
+
+    async def claim_email(
+        self, retired_id: UUID, placeholder_email: str, new_user: User, identity: OAuthIdentity
+    ) -> None:
+        retired = {"disabled": True, "password_hash": None, "is_admin": False, "email": placeholder_email}
+        async with self.engine.begin() as conn:
+            await conn.execute(update(t.users).where(t.users.c.id == str(retired_id)).values(retired))
+            await conn.execute(insert(t.users).values(_user_values(new_user, None)))
+            await conn.execute(insert(t.identities).values(_identity_values(new_user.id, identity)))
 
     async def user_by_id(self, user_id: UUID) -> User | None:
         return await self._one_user(t.users.c.id == str(user_id))
@@ -104,6 +105,9 @@ class SqlStore:
     async def set_admin(self, user_id: UUID, is_admin: bool) -> None:
         await self._set_user(user_id, is_admin=is_admin)
 
+    async def set_email_verified(self, user_id: UUID, verified: bool) -> None:
+        await self._set_user(user_id, email_verified=verified)
+
     async def _set_user(self, user_id: UUID, **values: Any) -> None:
         async with self.engine.begin() as conn:
             await conn.execute(update(t.users).where(t.users.c.id == str(user_id)).values(values))
@@ -112,15 +116,7 @@ class SqlStore:
         key = and_(t.identities.c.provider == identity.provider, t.identities.c.subject == identity.subject)
         async with self.engine.begin() as conn:
             await conn.execute(delete(t.identities).where(key))
-            await conn.execute(
-                insert(t.identities).values(
-                    provider=identity.provider,
-                    subject=identity.subject,
-                    user_id=str(user_id),
-                    email=identity.email,
-                    created_at=datetime.now(tz=None).astimezone(),
-                )
-            )
+            await conn.execute(insert(t.identities).values(_identity_values(user_id, identity)))
 
     async def user_by_identity(self, provider: OAuthProviderName, subject: str) -> User | None:
         query = (
@@ -383,3 +379,26 @@ def _totals(
         wholesale_pending=sum(1 for x in records if x.wholesale.status == "pending"),
         images=sum(1 for x in records if x.kind == "image"),
     )
+
+
+def _user_values(user: User, password_hash: str | None) -> dict[str, Any]:
+    return {
+        "id": str(user.id),
+        "email": user.email.lower(),
+        "display_name": user.display_name,
+        "password_hash": password_hash,
+        "is_admin": user.is_admin,
+        "disabled": user.disabled,
+        "email_verified": user.email_verified,
+        "created_at": user.created_at,
+    }
+
+
+def _identity_values(user_id: UUID, identity: OAuthIdentity) -> dict[str, Any]:
+    return {
+        "provider": identity.provider,
+        "subject": identity.subject,
+        "user_id": str(user_id),
+        "email": identity.email,
+        "created_at": datetime.now(tz=None).astimezone(),
+    }

@@ -33,10 +33,10 @@ class Settings(Contract):
     session_secret: SecretStr | None = None  # required to serve; `chatlpt gen-secret` prints one
     session_ttl_hours: int = Field(default=24 * 14, ge=1)
     secure_cookies: bool = False  # set true behind TLS
+    trust_forwarded_for: bool = False  # behind a reverse proxy: rate-limit by X-Forwarded-For (D26)
 
     # identity
-    admin_emails: str = ""  # comma-separated (D7)
-    allow_signup: bool = True  # D5
+    allow_signup: bool = True  # D5; open by default; close it for a public deployment (docs/RELIABILITY.md)
     google_client_id: str | None = None
     google_client_secret: SecretStr | None = None
     github_client_id: str | None = None
@@ -79,10 +79,6 @@ class Settings(Contract):
 
     # operations
     log_json: bool = True
-
-    @property
-    def admin_email_set(self) -> frozenset[str]:
-        return frozenset(e.strip().lower() for e in self.admin_emails.split(",") if e.strip())
 
     @property
     def approved_orchestrator_hosts(self) -> frozenset[str]:

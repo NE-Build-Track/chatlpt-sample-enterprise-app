@@ -50,9 +50,13 @@ class OAuthProvider(Protocol):
 
     name: OAuthProviderName
 
-    def authorization_url(self, redirect_uri: str, state: str, nonce: str) -> str: ...
+    def authorization_url(self, redirect_uri: str, state: str, code_verifier: str) -> str:
+        """The provider's consent URL, carrying ``state`` and the PKCE challenge for ``code_verifier``."""
+        ...
 
-    async def exchange(self, redirect_uri: str, code: str, nonce: str) -> OAuthIdentity: ...
+    async def exchange(self, redirect_uri: str, code: str, code_verifier: str) -> OAuthIdentity:
+        """Trade the code (with the PKCE verifier) for a verified identity. Raises NotAuthenticated."""
+        ...
 
 
 class UserStore(Protocol):
@@ -73,6 +77,15 @@ class UserStore(Protocol):
     async def set_disabled(self, user_id: UUID, disabled: bool) -> None: ...
 
     async def set_admin(self, user_id: UUID, is_admin: bool) -> None: ...
+
+    async def set_email_verified(self, user_id: UUID, verified: bool) -> None: ...
+
+    async def claim_email(
+        self, retired_id: UUID, placeholder_email: str, new_user: User, identity: OAuthIdentity
+    ) -> None:
+        """One transaction (D26): retire the unverified account (disabled, no password, not admin, email
+        renamed to the placeholder), then create ``new_user`` and link ``identity`` to it."""
+        ...
 
     async def list_users(self) -> list[User]: ...
 

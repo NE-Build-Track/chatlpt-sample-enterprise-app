@@ -51,6 +51,7 @@ erDiagram
 | `password_hash` | VARCHAR(255) | yes |  |
 | `is_admin` | BOOLEAN | no |  |
 | `disabled` | BOOLEAN | no |  |
+| `email_verified` | BOOLEAN | no |  |
 | `created_at` | DATETIME | no |  |
 
 ## `conversations`
