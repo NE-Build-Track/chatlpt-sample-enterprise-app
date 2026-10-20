@@ -58,7 +58,7 @@ Every assistant message records, and the UI shows:
 | --- | --- | --- |
 | Prompt, completion and reasoning tokens | the runner's `usage` in the final chunk | both |
 | **Retail** cost in USD | tokens × Alibaba Cloud Qwen3.8-27B list prices (D3, D4) | retail |
-| **Wholesale** cost in USD | the engine's cost for the job, `pending` until it arrives (D3) | wholesale |
+| **Wholesale** (network) cost in USD | read from the engine for the job whenever shown, `pending` until it arrives (D3, D29) | wholesale |
 
 - The price table lives in the repository with its source URL and the date observed
   ([qwen-pricing](../references/qwen-pricing.md)). Input, cached input, output and thinking-mode
@@ -68,7 +68,8 @@ Every assistant message records, and the UI shows:
 
 ### Admin
 
-- A minimal admin page: users, their token totals, retail and wholesale totals, and the margin.
+- A minimal admin page: users, their token totals, retail, network spend (delivered, and failed paid
+  work in its own column) and the margin after both (D29).
 - Admins can disable a user. There are no quotas in phase 1.
 
 ## Phase 2 (not scheduled)

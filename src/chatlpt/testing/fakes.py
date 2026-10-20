@@ -14,6 +14,7 @@ from chatlpt.contracts import (
     Message,
     ModelInfo,
     Money,
+    NetworkTotals,
     OAuthIdentity,
     OAuthProviderName,
     PriceTable,
@@ -26,7 +27,7 @@ from chatlpt.contracts import (
     User,
     WholesaleCost,
 )
-from chatlpt.errors import AppError, Conflict
+from chatlpt.errors import AppError, Conflict, NotFound
 
 
 class FixedClock:
@@ -106,7 +107,9 @@ class ScriptedBackend:
         self.available: tuple[bool, str | None] = (True, None)
         self.calls: list[tuple[UUID, list[ChatTurn], ChatParams, str]] = []
         self.reported: list[tuple[UUID, TokenUsage]] = []
-        self.costs: dict[UUID, WholesaleCost] = {}
+        self.costs: dict[UUID, WholesaleCost] = {}  # by job; a job not here is pending
+        self.owners: dict[UUID, UUID] = {}  # job -> user, for network_totals
+        self.unknown: set[UUID] = set()  # jobs the engine has no record of (a reset database)
         self.job_ids: list[UUID] = []
         self.model_info_calls = 0
         self.tools_offered: list[list[ToolSpec]] = []
@@ -128,6 +131,7 @@ class ScriptedBackend:
         if self.fail_with is not None:
             raise self.fail_with
         job_id = UUID(int=len(self.calls))
+        self.owners[job_id] = user_id
         self.job_ids.append(job_id)
         script = self.scripts.pop(0) if self.scripts else self.script
         return ScriptedReply(job_id, "https://orch.test:8935", script)
@@ -142,7 +146,23 @@ class ScriptedBackend:
         )
 
     async def wholesale(self, user_id: UUID, job_id: UUID) -> WholesaleCost:
+        if job_id in self.unknown:
+            raise NotFound(f"job {job_id} not found")
         return self.costs.get(job_id, WholesaleCost.pending())
+
+    async def network_totals(self, user_id: UUID, start: datetime, end: datetime) -> NetworkTotals:
+        mine = [job for job, owner in self.owners.items() if owner == user_id and job not in self.unknown]
+        costs = [self.costs.get(job, WholesaleCost.pending()) for job in mine]
+
+        def usd(*statuses: str) -> Money:
+            amounts = (c.amount.amount for c in costs if c.status in statuses and c.amount is not None)
+            return Money(amount=sum(amounts, Decimal(0)), currency="USD")
+
+        return NetworkTotals(
+            delivered=usd("delivered"),
+            failed=usd("failed_after_payment", "uncertain"),
+            pending=sum(1 for c in costs if c.status == "pending"),
+        )
 
     async def report_usage(self, user_id: UUID, job_id: UUID, usage: TokenUsage) -> None:
         self.reported.append((job_id, usage))
@@ -367,27 +387,6 @@ class MemoryStore:
     async def record(self, record: UsageRecord) -> None:
         self.records[record.message_id] = record
 
-    async def update_wholesale(self, message_id: UUID, wholesale: WholesaleCost) -> None:
-        record = self.records[message_id]
-        self.records[message_id] = record.model_copy(update={"wholesale": wholesale})
-        if message_id in self.messages:
-            self.messages[message_id] = self.messages[message_id].model_copy(update={"wholesale": wholesale})
-        if message_id in self.images:
-            image, path = self.images[message_id]
-            self.images[message_id] = (image.model_copy(update={"wholesale": wholesale}), path)
-
-    async def pending_wholesale(
-        self, limit: int = 100, settling_since: datetime | None = None
-    ) -> list[UsageRecord]:
-        def unsettled(x: UsageRecord) -> bool:
-            if x.wholesale.status in ("pending", "none"):
-                return True
-            updated = x.wholesale.updated_at
-            return settling_since is not None and updated is not None and updated >= settling_since
-
-        pending = [x for x in self.records.values() if unsettled(x) and x.job_id is not None]
-        return sorted(pending, key=lambda x: x.created_at)[:limit]
-
     async def totals(self, user_id: UUID | None, start: datetime, end: datetime) -> UsageTotals:
         items = [
             x
@@ -427,12 +426,7 @@ def totals_of(
         completion_tokens=sum(x.usage.completion_tokens for x in items),
         reasoning_tokens=sum(x.usage.reasoning_tokens for x in items),
         retail=Money(amount=sum((x.retail.amount for x in items), Decimal(0)), currency="USD"),
-        wholesale=Money(
-            amount=sum(
-                (x.wholesale.amount.amount for x in items if x.wholesale.amount is not None), Decimal(0)
-            ),
-            currency="USD",
-        ),
-        wholesale_pending=sum(1 for x in items if x.wholesale.status == "pending"),
+        wholesale=Money(amount=Decimal(0), currency="USD"),  # the engine's book, filled by the service
+        wholesale_pending=0,
         images=sum(1 for x in items if x.kind == "image"),
     )

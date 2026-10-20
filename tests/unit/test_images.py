@@ -101,7 +101,7 @@ async def test_the_model_draws_and_captions(
         and (image.width, image.height) == (1024, 768)
     )
     assert image.retail is not None and image.retail.amount == Decimal("0.003")  # 0.79 MP rounds up to 1
-    assert image.wholesale is not None and image.wholesale.status == "pending"
+    assert image.wholesale is not None and image.wholesale.status == "pending"  # shown, not stored (D29)
     assert (
         image_files.fetched == [f"https://images.test/{image_backend.calls[0][3] and image.job_id}.jpg"]
         or image_files.fetched

@@ -925,7 +925,7 @@
       },
       "UsageTotals": {
         "additionalProperties": false,
-        "description": "Aggregates over a period. Pending wholesale rows are counted, never folded into the total.",
+        "description": "Retail from the app's ledger, network from the engine (D29). Pending jobs are counted, never\nfolded into a total. ``wholesale`` is delivered spend; ``wholesale_failed`` is paid work that\ngave no usable result.",
         "properties": {
           "completion_tokens": {
             "title": "Completion Tokens",
@@ -975,6 +975,13 @@
           },
           "wholesale": {
             "$ref": "#/components/schemas/Money"
+          },
+          "wholesale_failed": {
+            "$ref": "#/components/schemas/Money",
+            "default": {
+              "amount": "0",
+              "currency": "USD"
+            }
           },
           "wholesale_pending": {
             "title": "Wholesale Pending",
@@ -1107,7 +1114,7 @@
       },
       "WholesaleCost": {
         "additionalProperties": false,
-        "description": "The engine's network cost for one job. ``none`` means the job never reached payment.",
+        "description": "The network cost of one job, read from the engine each time it is shown, never stored (D29).\n\n``none`` means no attempt was paid: a settled $0. ``pending`` means the engine has not seen the\nusage yet. The amount is present for ``none`` (zero), ``delivered``, ``failed_after_payment`` and\n``uncertain``.",
         "properties": {
           "amount": {
             "anyOf": [
@@ -1136,7 +1143,8 @@
               "pending",
               "delivered",
               "failed_after_payment",
-              "uncertain"
+              "uncertain",
+              "unknown"
             ],
             "title": "Status",
             "type": "string"

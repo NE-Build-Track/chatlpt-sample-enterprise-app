@@ -1,6 +1,5 @@
 """Wiring: the engine builder's degraded path, Application.from_settings, the wholesale loop and health."""
 
-import asyncio
 from decimal import Decimal
 from pathlib import Path
 
@@ -8,10 +7,9 @@ import pytest
 from pydantic import SecretStr
 
 from chatlpt.config import Settings
-from chatlpt.contracts import Money, NewMessage, NewUser, WholesaleCost
 from chatlpt.runtime import Application, package_version
 from chatlpt.runtime.engine import build_engine
-from chatlpt.testing import FixedClock, MemoryStore, PlainHasher, ScriptedBackend, StaticPrices
+from chatlpt.testing import FixedClock, MemoryStore, PlainHasher, StaticPrices
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -56,37 +54,6 @@ async def test_from_settings_boots_without_an_engine_and_configures_providers(
         health = await app.health()
         assert health.ready and not health.engine_configured and health.version == package_version()
         assert app.billing_prices().input_per_m == Decimal("0.5")
-    finally:
-        await app.stop()
-
-
-async def test_wholesale_loop_fills_costs_and_survives_errors() -> None:
-    store, backend, clock = MemoryStore(), ScriptedBackend(), FixedClock()
-    settings = Settings(session_secret=SecretStr("s"), wholesale_sync_interval_s=0.01)
-    app = Application(
-        settings,
-        store=store,
-        backend=backend,
-        clock=clock,
-        hasher=PlainHasher(),
-        prices=StaticPrices(),
-        oauth={},
-    )
-    user = await app.auth.signup(NewUser(email="a@example.com", password="correct horse"))
-    conversation = await app.conversations.create(user)
-    queue = app.chat.start_reply(user, conversation.id, NewMessage(content="hi"))
-    while await queue.get() is not None:
-        pass
-    backend.costs[backend.job_ids[0]] = WholesaleCost(
-        status="delivered", amount=Money(amount=Decimal("0.00001"))
-    )
-    await app.start()
-    try:
-        for _ in range(100):
-            if not await store.pending_wholesale():
-                break
-            await asyncio.sleep(0.01)
-        assert await store.pending_wholesale() == []
     finally:
         await app.stop()
 

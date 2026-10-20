@@ -74,8 +74,6 @@ class Settings(Contract):
 
     # billing
     pricing_file: str = "config/pricing/qwen3.8-27b.json"
-    wholesale_sync_interval_s: float = Field(default=20.0, gt=0)
-    wholesale_settle_minutes: int = Field(default=10, ge=0)  # keep re-reading a filled cost this long
 
     # operations
     log_json: bool = True

@@ -77,11 +77,6 @@ class ImageService:
         relative = self._files.save(image_id, result.content_type, data)
         now = self._clock.now()
         retail = self.retail(result.width, result.height)
-        wholesale = (
-            WholesaleCost.pending().model_copy(update={"orchestrator_url": result.orchestrator_url})
-            if result.job_id is not None
-            else WholesaleCost(status="none")
-        )
         image = GeneratedImage(
             id=image_id,
             message_id=message_id,
@@ -96,7 +91,6 @@ class ImageService:
             job_id=result.job_id,
             orchestrator_url=result.orchestrator_url,
             retail=retail,
-            wholesale=wholesale,
             created_at=now,
         )
         await self._images.add_image(image, relative)
@@ -109,7 +103,6 @@ class ImageService:
                 job_id=result.job_id,
                 usage=TokenUsage(prompt_tokens=0, completion_tokens=0),
                 retail=retail,
-                wholesale=wholesale,
                 created_at=now,
             )
         )
@@ -123,7 +116,10 @@ class ImageService:
                 "flagged": result.flagged,
             },
         )
-        return image
+        if image.job_id is None:
+            return image
+        pending = WholesaleCost(status="pending", orchestrator_url=image.orchestrator_url)
+        return image.model_copy(update={"wholesale": pending})  # shown, never stored (D29)
 
     async def open(self, user: User, image_id: UUID) -> tuple[GeneratedImage, str]:
         """The image and its file path, for the owner only. Others get NotFound."""

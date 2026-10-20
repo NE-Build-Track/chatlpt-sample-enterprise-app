@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, and_, delete, event, insert, or_, select, update
+from sqlalchemy import and_, delete, event, insert, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
@@ -22,7 +22,6 @@ from chatlpt.contracts import (
     UsageRecord,
     UsageTotals,
     User,
-    WholesaleCost,
 )
 from chatlpt.errors import Conflict
 from chatlpt.store import rows as r
@@ -274,45 +273,6 @@ class SqlStore:
         async with self.engine.begin() as conn:
             await conn.execute(insert(t.usage_records).values(r.usage_record_values(record)))
 
-    async def update_wholesale(self, message_id: UUID, wholesale: WholesaleCost) -> None:
-        amount = None if wholesale.amount is None else str(wholesale.amount.amount)
-        async with self.engine.begin() as conn:
-            await conn.execute(
-                update(t.usage_records)
-                .where(t.usage_records.c.message_id == str(message_id))
-                .values(
-                    wholesale_status=wholesale.status,
-                    wholesale_usd=amount,
-                    wholesale_orchestrator_url=wholesale.orchestrator_url,
-                    wholesale_updated_at=wholesale.updated_at,
-                )
-            )
-            for table in (t.messages, t.images):
-                await conn.execute(
-                    update(table)
-                    .where(table.c.id == str(message_id))
-                    .values(
-                        wholesale_status=wholesale.status,
-                        wholesale_usd=amount,
-                        wholesale_updated_at=wholesale.updated_at,
-                    )
-                )
-
-    async def pending_wholesale(
-        self, limit: int = 100, settling_since: datetime | None = None
-    ) -> list[UsageRecord]:
-        unsettled: ColumnElement[bool] = t.usage_records.c.wholesale_status.in_(("pending", "none"))
-        if settling_since is not None:
-            unsettled = or_(unsettled, t.usage_records.c.wholesale_updated_at >= settling_since)
-        query = (
-            select(t.usage_records)
-            .where(unsettled, t.usage_records.c.job_id.is_not(None))
-            .order_by(t.usage_records.c.created_at)
-            .limit(limit)
-        )
-        async with self.engine.connect() as conn:
-            return [r.usage_record_from(row) for row in (await conn.execute(query)).mappings()]
-
     async def totals(self, user_id: UUID | None, start: datetime, end: datetime) -> UsageTotals:
         where = [t.usage_records.c.created_at >= start, t.usage_records.c.created_at < end]
         if user_id is not None:
@@ -362,10 +322,8 @@ class SqlStore:
 def _totals(
     user_id: UUID | None, start: datetime, end: datetime, records: Sequence[UsageRecord]
 ) -> UsageTotals:
+    """The retail book's totals. Network fields stay zero here; the engine fills them (D29)."""
     retail = sum((x.retail.amount for x in records), Decimal(0))
-    wholesale = sum(
-        (x.wholesale.amount.amount for x in records if x.wholesale.amount is not None), Decimal(0)
-    )
     return UsageTotals(
         user_id=user_id,
         start=start,
@@ -375,8 +333,8 @@ def _totals(
         completion_tokens=sum(x.usage.completion_tokens for x in records),
         reasoning_tokens=sum(x.usage.reasoning_tokens for x in records),
         retail=Money(amount=retail, currency="USD"),
-        wholesale=Money(amount=wholesale, currency="USD"),
-        wholesale_pending=sum(1 for x in records if x.wholesale.status == "pending"),
+        wholesale=Money(amount=Decimal(0), currency="USD"),
+        wholesale_pending=0,
         images=sum(1 for x in records if x.kind == "image"),
     )
 

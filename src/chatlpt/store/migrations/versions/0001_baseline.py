@@ -1,7 +1,8 @@
 """The baseline schema: users, identities, conversations, messages, images, the usage ledger, model info.
 
 ChatLPT started over on 20 October 2026 with a fresh database, so the first four migrations were
-folded into this one (D26). Later schema changes add migrations on top of it.
+folded into this one (D28). Network cost is not stored: it is read from the engine (D29). Later
+schema changes add migrations on top of it.
 
 Revision ID: 0001
 Revises:
@@ -69,9 +70,6 @@ def upgrade() -> None:
         sa.Column("reasoning_tokens", sa.Integer, nullable=True),
         sa.Column("cached_prompt_tokens", sa.Integer, nullable=True),
         sa.Column("retail_usd", sa.String(64), nullable=True),
-        sa.Column("wholesale_status", sa.String(24), nullable=True),
-        sa.Column("wholesale_usd", sa.String(64), nullable=True),
-        sa.Column("wholesale_updated_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("finish_reason", sa.String(32), nullable=True),
         sa.Column("continues_message_id", sa.String(36), nullable=True),
         sa.Column("dropped_turns", sa.Integer, nullable=True),
@@ -91,15 +89,10 @@ def upgrade() -> None:
         sa.Column("reasoning_tokens", sa.Integer, nullable=False, server_default="0"),
         sa.Column("cached_prompt_tokens", sa.Integer, nullable=False, server_default="0"),
         sa.Column("retail_usd", sa.String(64), nullable=False),
-        sa.Column("wholesale_status", sa.String(24), nullable=False),
-        sa.Column("wholesale_usd", sa.String(64), nullable=True),
-        sa.Column("wholesale_orchestrator_url", sa.String(255), nullable=True),
-        sa.Column("wholesale_updated_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
     )
     op.create_index("ix_usage_user_created", "usage_records", ["user_id", "created_at"])
     op.create_index("ix_usage_conversation", "usage_records", ["conversation_id"])
-    op.create_index("ix_usage_wholesale_status", "usage_records", ["wholesale_status"])
     op.create_table(
         "images",
         sa.Column("id", sa.String(36), primary_key=True),
@@ -119,9 +112,6 @@ def upgrade() -> None:
         sa.Column("job_id", sa.String(36), nullable=True),
         sa.Column("orchestrator_url", sa.String(255), nullable=True),
         sa.Column("retail_usd", sa.String(64), nullable=True),
-        sa.Column("wholesale_status", sa.String(24), nullable=True),
-        sa.Column("wholesale_usd", sa.String(64), nullable=True),
-        sa.Column("wholesale_updated_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("expired_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
     )

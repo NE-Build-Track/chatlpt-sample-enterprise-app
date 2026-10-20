@@ -102,8 +102,8 @@ Browser ──session cookie──▶ chatlpt (FastAPI + static React)
 A reply: the route authenticates the session, the chat service builds the message list within the
 derived context window, the engine adapter runs the paid job with `stream_options.include_usage`,
 chunks go to the browser as server-sent events and are saved on completion with token counts, the
-retail cost is computed from the price table, and a background task fills the wholesale cost when
-the engine reports it. If the browser leaves mid-reply, the app keeps reading so the paid reply is
+retail cost is computed from the price table, and the network cost is read from the engine whenever
+the reply is shown (D29); nothing copies it. If the browser leaves mid-reply, the app keeps reading so the paid reply is
 not lost.
 
 ## Conventions
@@ -112,7 +112,8 @@ not lost.
   with dependency direction and third-party confinement enforced by `tests/structure/`.
 - **Parse at the boundary:** frozen pydantic contracts in Python, zod schemas in TypeScript.
 - **Money is `Decimal` with a currency.** Missing cost is `pending`, never zero.
-- **Two books, never mixed.** Wholesale and retail have separate columns and separate sources.
+- **Two books, never mixed.** Retail lives in the app's ledger; network cost lives in the engine and is
+  read by job id (D29).
 - **The browser holds a session cookie and nothing else.**
 - **Reserved features answer 501.** Schema changes ship with a migration and regenerated docs.
 - **Plans are artifacts** in `docs/exec-plans/` with progress and decision logs.

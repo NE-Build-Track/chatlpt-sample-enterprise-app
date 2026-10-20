@@ -37,6 +37,7 @@ from chatlpt.services.context import ContextService
 from chatlpt.services.conversations import ConversationService
 from chatlpt.services.images import ImageService
 from chatlpt.services.limits import AttemptLimiter
+from chatlpt.services.network import NetworkCostService
 from chatlpt.store import SqlStore
 
 _LOG = logging.getLogger(__name__)
@@ -119,9 +120,9 @@ class Application:
                 "high": settings.thinking_budget_high,
             },
             history_turn_limit=settings.history_turn_limit,
-            wholesale_settle_window=timedelta(minutes=settings.wholesale_settle_minutes),
         )
-        self.admin = AdminService(store, store)
+        self.network = NetworkCostService(store, backend)  # read from the engine, never copied (D29)
+        self.admin = AdminService(store, self.network)
         self._prices = prices
         self._metadata = metadata
         self._tasks: list[asyncio.Task[None]] = []
@@ -185,7 +186,6 @@ class Application:
             await self._engine.start()  # type: ignore[attr-defined]
         self._stop.clear()
         self._tasks = [
-            asyncio.create_task(self._wholesale_loop(), name="wholesale-sync"),
             asyncio.create_task(self._retention_loop(), name="image-retention"),
         ]
         _LOG.info(
@@ -205,20 +205,6 @@ class Application:
             await self._engine.stop()  # type: ignore[attr-defined]
         await self.store.close()
         _LOG.info("application stopped", extra={"event": "app.stopped"})
-
-    async def _wholesale_loop(self) -> None:
-        interval = self.settings.wholesale_sync_interval_s
-        while not self._stop.is_set():
-            try:
-                filled = await self.chat.sync_wholesale()
-                if filled:
-                    _LOG.info(
-                        "wholesale filled", extra={"event": "billing.wholesale_filled", "count": filled}
-                    )
-            except Exception:
-                _LOG.exception("wholesale sync failed", extra={"event": "billing.wholesale_sync_crashed"})
-            with contextlib.suppress(asyncio.TimeoutError, TimeoutError):
-                await asyncio.wait_for(self._stop.wait(), timeout=interval)
 
     def billing_prices(self) -> PriceTable:
         return self._prices.table()

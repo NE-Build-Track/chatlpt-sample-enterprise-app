@@ -27,7 +27,7 @@ export const TokenUsage = z.object({
 export type TokenUsage = z.infer<typeof TokenUsage>;
 
 export const WholesaleCost = z.object({
-  status: z.enum(["none", "pending", "delivered", "failed_after_payment", "uncertain"]),
+  status: z.enum(["none", "pending", "delivered", "failed_after_payment", "uncertain", "unknown"]),
   amount: Money.nullable().optional(),
   orchestrator_url: z.string().nullable().optional(),
   updated_at: z.string().nullable().optional(),
@@ -102,9 +102,10 @@ export const UsageTotals = z.object({
   completion_tokens: z.number(),
   reasoning_tokens: z.number(),
   retail: Money,
-  wholesale: Money,
+  wholesale: Money, // delivered network spend (D29)
   wholesale_pending: z.number(),
   images: z.number().default(0),
+  wholesale_failed: Money, // paid, with no usable result: failed after payment plus uncertain
 });
 export type UsageTotals = z.infer<typeof UsageTotals>;
 

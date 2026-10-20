@@ -30,7 +30,6 @@ def settings() -> Settings:
     return Settings(
         session_secret=SecretStr("test-secret"),
         static_dir="/nonexistent",
-        wholesale_sync_interval_s=3600,
     )
 
 

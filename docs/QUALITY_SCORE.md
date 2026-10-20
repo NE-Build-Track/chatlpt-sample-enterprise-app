@@ -10,7 +10,7 @@ debt), B (tested, minor debt), C (works, gaps), D (scaffold), – (not started).
 | Identity | C | Email/password and provider linking tested; the OAuth adapters themselves are untested against real providers (plan-03) |
 | Conversations and chat | B | Reply pipeline tested with the scripted backend; streamed live through the engine (evidence 2026-10-19) |
 | Context window | B | Derived from the smallest advertised window; output reserve capped at half the window; dropped turns reported; token estimate approximate (T1) |
-| Billing (two books) | B | Retail exact and property-tested for chat and images; wholesale filled and settled live; the app's own probes are not in the ledger (T6) |
+| Billing (two books) | B | Retail exact and property-tested for chat and images; network cost read from the engine (D29), failed paid replies included; the app's own probes are not in the ledger (T6) |
 | Admin | C | Routes and permissions tested; image counts shown; no quotas (phase 2) |
 | Images (model-driven) | B | Tool loop, pricing, retention and the route tested; shown live through the app; one image model, no editing |
 | Store and migrations | B | Contract suite runs on SQLite and the in-memory fake; migration drift test |

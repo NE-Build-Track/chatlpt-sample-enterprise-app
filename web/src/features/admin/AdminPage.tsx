@@ -21,7 +21,9 @@ export function AdminPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">Admin · this month</h1>
-          <p className="text-sm text-muted-foreground">Retail is tokens at list price. Network is what Livepeer charged. The gap is the margin.</p>
+          <p className="text-sm text-muted-foreground">
+            Retail is tokens at list price. Network is what Livepeer charged for delivered replies; failed network is paid work that gave no usable reply. Margin is retail minus both.
+          </p>
         </div>
         <Button variant="outline" asChild><Link to="/">Back to chat</Link></Button>
       </div>
@@ -34,13 +36,16 @@ export function AdminPage() {
             <TableHead className="text-right">Tokens in / out</TableHead>
             <TableHead className="text-right">Retail</TableHead>
             <TableHead className="text-right">Network</TableHead>
+            <TableHead className="text-right">Failed network</TableHead>
             <TableHead className="text-right">Margin</TableHead>
             <TableHead />
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows.map(({ user, totals }) => {
-            const margin = totals ? Number(totals.retail.amount) - Number(totals.wholesale.amount) : null;
+            const margin = totals
+              ? Number(totals.retail.amount) - Number(totals.wholesale.amount) - Number(totals.wholesale_failed.amount)
+              : null;
             return (
               <TableRow key={user.id} className={user.disabled ? "opacity-60" : undefined}>
                 <TableCell>
@@ -63,6 +68,7 @@ export function AdminPage() {
                   {formatMoney(totals?.wholesale)}
                   {totals && totals.wholesale_pending > 0 && <span className="text-xs text-muted-foreground"> +{totals.wholesale_pending} pending</span>}
                 </TableCell>
+                <TableCell className="text-right">{formatMoney(totals?.wholesale_failed)}</TableCell>
                 <TableCell className="text-right">{margin === null ? "–" : formatMoney({ amount: margin.toFixed(10), currency: "USD" })}</TableCell>
                 <TableCell className="text-right">
                   {user.id !== me.data?.id && (
@@ -81,7 +87,13 @@ export function AdminPage() {
             <TableCell className="text-right">{formatTokens(sum((t) => t.prompt_tokens))} / {formatTokens(sum((t) => t.completion_tokens))}</TableCell>
             <TableCell className="text-right">{formatMoney({ amount: sum((t) => Number(t.retail.amount)).toFixed(10), currency: "USD" })}</TableCell>
             <TableCell className="text-right">{formatMoney({ amount: sum((t) => Number(t.wholesale.amount)).toFixed(10), currency: "USD" })}</TableCell>
-            <TableCell className="text-right">{formatMoney({ amount: (sum((t) => Number(t.retail.amount)) - sum((t) => Number(t.wholesale.amount))).toFixed(10), currency: "USD" })}</TableCell>
+            <TableCell className="text-right">{formatMoney({ amount: sum((t) => Number(t.wholesale_failed.amount)).toFixed(10), currency: "USD" })}</TableCell>
+            <TableCell className="text-right">
+              {formatMoney({
+                amount: (sum((t) => Number(t.retail.amount)) - sum((t) => Number(t.wholesale.amount)) - sum((t) => Number(t.wholesale_failed.amount))).toFixed(10),
+                currency: "USD",
+              })}
+            </TableCell>
             <TableCell />
           </TableRow>
         </TableBody>

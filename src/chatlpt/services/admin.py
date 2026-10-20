@@ -5,13 +5,14 @@ from uuid import UUID
 
 from chatlpt.contracts import UsageTotals, User
 from chatlpt.errors import AccessDenied, NotFound
-from chatlpt.protocols import UsageLedger, UserStore
+from chatlpt.protocols import UserStore
+from chatlpt.services.network import NetworkCostService
 
 
 class AdminService:
-    def __init__(self, users: UserStore, ledger: UsageLedger) -> None:
+    def __init__(self, users: UserStore, network: NetworkCostService) -> None:
         self._users = users
-        self._ledger = ledger
+        self._network = network
 
     @staticmethod
     def require(admin: User) -> None:
@@ -24,7 +25,7 @@ class AdminService:
 
     async def totals_by_user(self, admin: User, start: datetime, end: datetime) -> list[UsageTotals]:
         self.require(admin)
-        return await self._ledger.totals_by_user(start, end)
+        return await self._network.totals_by_user(await self._users.list_users(), start, end)
 
     async def set_disabled(self, admin: User, user_id: UUID, disabled: bool) -> User:
         self.require(admin)

@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from chatlpt.contracts import NewMessage, NewUser, ReplyChunk, TokenUsage, UsageRecord, WholesaleCost
+from chatlpt.contracts import NewMessage, NewUser, ReplyChunk, WholesaleCost
 from chatlpt.errors import AccessDenied, ChatUnavailable, NotFound, ReplyFailed
 from chatlpt.runtime import Application
 from chatlpt.testing import MemoryStore, ScriptedBackend
@@ -66,47 +66,42 @@ async def test_reply_without_usage_records_no_retail(
     assert final is not None and final.retail is None and final.usage is None and store.records == {}
 
 
-async def test_sync_wholesale_skips_records_without_jobs_and_tolerates_lookup_errors(
-    application: Application, store: MemoryStore, backend: ScriptedBackend
+async def test_network_costs_are_unknown_never_zero_when_the_engine_cannot_say(
+    application: Application, store: MemoryStore, backend: ScriptedBackend, caplog: pytest.LogCaptureFixture
 ) -> None:
-    user = await application.auth.signup(NewUser(email="e@example.com", password="correct horse"))
-    usage = TokenUsage(prompt_tokens=1, completion_tokens=1)
     from decimal import Decimal
 
-    from chatlpt.contracts import Money
+    from chatlpt.contracts import Money, NetworkTotals
+    from chatlpt.errors import ChatUnavailable
+    from chatlpt.services.network import NetworkCostService
 
-    await store.record(
-        UsageRecord(
-            message_id=uuid4(),
-            user_id=user.id,
-            conversation_id=uuid4(),
-            job_id=None,
-            usage=usage,
-            retail=Money(amount=Decimal(0)),
-            wholesale=WholesaleCost.pending(),
-            created_at=application.clock.now(),
-        )
-    )
+    user = await application.auth.signup(NewUser(email="e@example.com", password="correct horse"))
+    assert (await NetworkCostService(store, None).cost(user.id, uuid4(), paid=True)).status == "unknown"
     job_id = uuid4()
-    await store.record(
-        UsageRecord(
-            message_id=uuid4(),
-            user_id=user.id,
-            conversation_id=uuid4(),
-            job_id=job_id,
-            usage=usage,
-            retail=Money(amount=Decimal(0)),
-            wholesale=WholesaleCost.pending(),
-            created_at=application.clock.now(),
-        )
-    )
 
-    async def fail(*args: object) -> WholesaleCost:
+    async def down(user_id: object, job_id: object) -> WholesaleCost:
         raise ChatUnavailable("engine down")
 
-    backend.wholesale = fail  # type: ignore[method-assign]
-    assert await application.chat.sync_wholesale() == 0
-    assert [x.job_id for x in await store.pending_wholesale()] == [job_id]  # the job-less row is never polled
+    backend.wholesale = down  # type: ignore[method-assign]
+    assert (await application.network.cost(user.id, job_id, paid=True)).status == "unknown"
+
+    async def nothing_paid(user_id: object, job_id: object) -> WholesaleCost:
+        return WholesaleCost(status="none", amount=Money(amount=Decimal(0)))
+
+    backend.wholesale = nothing_paid  # type: ignore[method-assign]
+    with caplog.at_level("WARNING"):
+        settled = await application.network.cost(user.id, job_id, paid=True)
+    assert settled.status == "none" and settled.amount == Money(amount=Decimal(0))  # $0, settled (D29)
+    assert any(getattr(r, "event", None) == "billing.network_none_but_paid" for r in caplog.records)
+
+    async def totals_down(*args: object) -> NetworkTotals:
+        raise ChatUnavailable("engine down")
+
+    backend.network_totals = totals_down  # type: ignore[method-assign]
+    month = (application.clock.now().replace(day=1), application.clock.now().replace(day=28))
+    assert (await application.network.user_totals(user.id, *month)).wholesale.amount == 0
+    empty = await NetworkCostService(store, None).user_totals(user.id, *month)
+    assert empty.wholesale_pending == 0 and empty.wholesale_failed.amount == 0
 
 
 async def test_admin_edges(application: Application) -> None:
@@ -165,7 +160,7 @@ async def test_partial_text_survives_a_failure_mid_stream(
     class Breaking(ScriptedReply):
         async def _iterate(self):  # type: ignore[no-untyped-def]
             yield ReplyChunk(kind="content", text="half an ")
-            raise ReplyFailed("stream cut", payment_sent=True, uncertain=True)
+            raise ReplyFailed("stream cut", payment_sent=True, uncertain=True, job_id=self.job_id)
 
     async def open_reply(*args: object, **kwargs: object) -> Breaking:
         return Breaking(uuid4(), "https://orch.test", [])
@@ -177,5 +172,6 @@ async def test_partial_text_survives_a_failure_mid_stream(
     assert (
         reply.state == "uncertain"
         and reply.content == "half an "
-        and reply.wholesale == WholesaleCost.pending()
+        and reply.job_id is not None  # its network cost is read from the engine (D29)
+        and reply.wholesale is None
     )

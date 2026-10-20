@@ -16,7 +16,6 @@ from chatlpt.contracts import (
     ToolCall,
     UsageRecord,
     User,
-    WholesaleCost,
 )
 from chatlpt.utils import utc
 
@@ -72,19 +71,6 @@ def usage_from(row: Mapping[Any, Any]) -> TokenUsage | None:
     )
 
 
-def wholesale_from(row: Mapping[Any, Any], *, url_key: str | None = None) -> WholesaleCost | None:
-    status = row["wholesale_status"]
-    if status is None:
-        return None
-    updated = row["wholesale_updated_at"]
-    return WholesaleCost(
-        status=status,
-        amount=_money(row["wholesale_usd"]),
-        orchestrator_url=row.get(url_key) if url_key else None,
-        updated_at=None if updated is None else utc(updated),
-    )
-
-
 def message_from(row: Mapping[Any, Any], images: Sequence[GeneratedImage] = ()) -> Message:
     return Message(
         id=UUID(row["id"]),
@@ -100,7 +86,6 @@ def message_from(row: Mapping[Any, Any], images: Sequence[GeneratedImage] = ()) 
         orchestrator_url=row["orchestrator_url"],
         usage=usage_from(row),
         retail=_money(row["retail_usd"]),
-        wholesale=wholesale_from(row),
         finish_reason=row["finish_reason"],
         continues_message_id=None
         if row["continues_message_id"] is None
@@ -113,7 +98,6 @@ def message_from(row: Mapping[Any, Any], images: Sequence[GeneratedImage] = ()) 
 
 def message_values(message: Message) -> dict[str, Any]:
     usage = message.usage
-    wholesale = message.wholesale
     return {
         "id": str(message.id),
         "conversation_id": str(message.conversation_id),
@@ -132,11 +116,6 @@ def message_values(message: Message) -> dict[str, Any]:
         "reasoning_tokens": None if usage is None else usage.reasoning_tokens,
         "cached_prompt_tokens": None if usage is None else usage.cached_prompt_tokens,
         "retail_usd": None if message.retail is None else str(message.retail.amount),
-        "wholesale_status": None if wholesale is None else wholesale.status,
-        "wholesale_usd": None
-        if wholesale is None or wholesale.amount is None
-        else str(wholesale.amount.amount),
-        "wholesale_updated_at": None if wholesale is None else wholesale.updated_at,
         "finish_reason": message.finish_reason,
         "continues_message_id": None
         if message.continues_message_id is None
@@ -172,14 +151,12 @@ def image_from(row: Mapping[Any, Any]) -> GeneratedImage:
         job_id=_uuid(row["job_id"]),
         orchestrator_url=row["orchestrator_url"],
         retail=_money(row["retail_usd"]),
-        wholesale=wholesale_from(row, url_key="orchestrator_url"),
         expired=row["expired_at"] is not None,
         created_at=utc(row["created_at"]),
     )
 
 
 def image_values(image: GeneratedImage, path: str, user_id: UUID) -> dict[str, Any]:
-    wholesale = image.wholesale
     return {
         "id": str(image.id),
         "message_id": str(image.message_id),
@@ -196,11 +173,6 @@ def image_values(image: GeneratedImage, path: str, user_id: UUID) -> dict[str, A
         "job_id": _text_id(image.job_id),
         "orchestrator_url": image.orchestrator_url,
         "retail_usd": None if image.retail is None else str(image.retail.amount),
-        "wholesale_status": None if wholesale is None else wholesale.status,
-        "wholesale_usd": None
-        if wholesale is None or wholesale.amount is None
-        else str(wholesale.amount.amount),
-        "wholesale_updated_at": None if wholesale is None else wholesale.updated_at,
         "expired_at": None,
         "created_at": image.created_at,
     }
@@ -209,8 +181,6 @@ def image_values(image: GeneratedImage, path: str, user_id: UUID) -> dict[str, A
 def usage_record_from(row: Mapping[Any, Any]) -> UsageRecord:
     usage = usage_from(row)
     assert usage is not None  # the ledger columns are NOT NULL
-    wholesale = wholesale_from(row, url_key="wholesale_orchestrator_url")
-    assert wholesale is not None
     return UsageRecord(
         message_id=UUID(row["message_id"]),
         kind=row["kind"] or "chat",
@@ -219,7 +189,6 @@ def usage_record_from(row: Mapping[Any, Any]) -> UsageRecord:
         job_id=None if row["job_id"] is None else UUID(row["job_id"]),
         usage=usage,
         retail=Money(amount=Decimal(row["retail_usd"]), currency="USD"),
-        wholesale=wholesale,
         created_at=utc(row["created_at"]),
     )
 
@@ -236,10 +205,6 @@ def usage_record_values(record: UsageRecord) -> dict[str, Any]:
         "reasoning_tokens": record.usage.reasoning_tokens,
         "cached_prompt_tokens": record.usage.cached_prompt_tokens,
         "retail_usd": str(record.retail.amount),
-        "wholesale_status": record.wholesale.status,
-        "wholesale_usd": None if record.wholesale.amount is None else str(record.wholesale.amount.amount),
-        "wholesale_orchestrator_url": record.wholesale.orchestrator_url,
-        "wholesale_updated_at": record.wholesale.updated_at,
         "created_at": record.created_at,
     }
 

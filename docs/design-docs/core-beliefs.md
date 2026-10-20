@@ -6,10 +6,12 @@ steer, agents execute, and the repository is the only context an agent has.
 
 ## Product
 
-1. **Two books.** Wholesale is what the network charged, from the engine. Retail is what the tokens
-   are worth at list price, from the app. Both are shown; neither is derived from the other.
-2. **Missing evidence is never zero.** A wholesale cost that has not arrived is `pending`. A reply
-   whose payment went out but whose outcome is unknown is `uncertain`.
+1. **Two books.** Wholesale is what the network charged, read from the engine whenever it is shown
+   and never copied (D29). Retail is what the tokens are worth at list price, from the app. Both are
+   shown; neither is derived from the other.
+2. **Missing evidence is never zero.** A network cost that has not arrived is `pending`; one the
+   engine has no record of is `unknown`. A reply whose payment went out but whose outcome is unknown
+   is `uncertain`.
 3. **The browser holds a session, nothing else.** No engine key, payment key or admin key reaches a
    client bundle, template, response or log.
 4. **It should feel like ChatGPT.** Familiar layout and behavior lower the bar for users; the

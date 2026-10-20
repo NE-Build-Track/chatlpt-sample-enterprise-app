@@ -15,7 +15,8 @@ Pinned to branch **`tasks/m3/mz/stream-support`** of `NE-Build-Track/livepeer-bu
 | A reply | `engine.jobs.stream(actor, JobRequest(app="blueclaw/chat/qwen3.8-27b", path="/v1/chat/completions", payload={..., "stream": true, "stream_options": {"include_usage": true}}, operation_ref=..., max_attempts=..., timeout_s=..., idle_timeout_s=...))` | A `JobStream` of SSE bytes; `jobs.run` remains the fallback for an engine without streaming |
 | Model limits | the same, `method="GET"`, `path="/v1/models"` | Billed per second (tiny); cached (D14) |
 | Token usage | `engine.jobs.report_usage(actor, job_id, {"prompt_tokens": n, ...})` | Once per job, owner only, succeeded jobs only |
-| Wholesale cost | `engine.costs.for_job(actor, job_id)` | `pending` until Batteries reports; then `delivered`, `failed_after_payment`, `uncertain` |
+| Network cost of a job | `engine.costs.for_job(actor, job_id)`, each time it is shown (D29) | `pending` until Batteries reports; then `delivered`, `failed_after_payment`, `uncertain`; `none` = nothing paid ($0) |
+| A user's network totals | `engine.costs.summary(actor, start, end)` | By class; `jobs_pending` beside the totals. A finished job gets its cost record within one engine cost-sync cycle (30 s) |
 | Allowance | `engine.payments.allowance(actor)` | The shared allocation's granted/spent/available |
 
 ## Behavior to design around
@@ -26,7 +27,7 @@ Pinned to branch **`tasks/m3/mz/stream-support`** of `NE-Build-Track/livepeer-bu
 - **Failover only before payment.** After payment the job is bound to a runner; a timeout leaves it `uncertain`.
 - **`per_application` mode** needs `LPB_SHARED_PAYMENT_KEY` and `LPB_SHARED_ALLOCATION_ID`; jobs still carry `actor_id`.
 - **`LPB_BATTERIES_OPERATOR_TOKEN` is required** when `LPB_BATTERIES_URL` is set, even if we never create grants from the app.
-- **Money is `Decimal`**; a cost status of `none` means "not yet known", never free.
+- **Money is `Decimal`.** A cost status of `none` means no attempt was paid: a settled $0 (D29).
 - **One engine process per database.** Fine: one container.
 - **Discovery** refreshes every `LPB_DISCOVERY_INTERVAL_S` (15 s) and is stale after three misses.
 

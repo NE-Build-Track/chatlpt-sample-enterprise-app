@@ -8,7 +8,7 @@ import { HttpError } from "@/api/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Composer } from "./Composer";
 import { MessageItem } from "./MessageItem";
-import { formatMoney } from "@/features/usage/format";
+import { formatMoney, networkSpent } from "@/features/usage/format";
 import { ThinkingSelect } from "./ThinkingSelect";
 
 type Live = { message: Message; content: string; reasoning: string };
@@ -153,7 +153,7 @@ export function ChatPage() {
       </div>
       {totals && totals.replies > 0 && (
         <p className="px-4 pb-1 text-center text-xs text-muted-foreground">
-          Conversation · {totals.replies} replies · retail {formatMoney(totals.retail)} · network {formatMoney(totals.wholesale)}
+          Conversation · {totals.replies} replies · retail {formatMoney(totals.retail)} · network {formatMoney(networkSpent(totals))}
           {totals.wholesale_pending > 0 ? ` (+${totals.wholesale_pending} pending)` : ""}
         </p>
       )}

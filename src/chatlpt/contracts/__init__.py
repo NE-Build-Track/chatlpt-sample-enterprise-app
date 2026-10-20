@@ -3,6 +3,7 @@
 from chatlpt.contracts.billing import (
     ImagePriceTable,
     LedgerKind,
+    NetworkTotals,
     PriceTable,
     TokenUsage,
     UsageRecord,
@@ -62,6 +63,7 @@ __all__ = [
     "MessageKind",
     "ModelInfo",
     "Money",
+    "NetworkTotals",
     "NewMessage",
     "NewUser",
     "OAuthIdentity",

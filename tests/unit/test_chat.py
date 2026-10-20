@@ -34,8 +34,12 @@ async def test_reply_writes_both_books_and_titles_the_conversation(
     assert final.retail == Money(
         amount=Decimal(12) * Decimal("0.50") / 10**6 + Decimal(6) * Decimal("3.00") / 10**6
     )
-    assert final.wholesale is not None and final.wholesale.status == "pending"
+    assert final.wholesale == WholesaleCost(status="pending", orchestrator_url="https://orch.test:8935")
     assert final.job_id == backend.job_ids[0] and final.orchestrator_url == "https://orch.test:8935"
+    stored = await store.get_message(final.id)
+    assert stored is not None and stored.wholesale is None  # never stored; read from the engine (D29)
+    (shown,) = await application.network.with_costs(user.id, [stored])
+    assert shown.wholesale == WholesaleCost(status="pending", orchestrator_url="https://orch.test:8935")
     assert (await store.get_conversation(conversation.id)).title == "Hello there, model"  # type: ignore[union-attr]
     assert len(store.records) == 1 and backend.reported == [(final.job_id, final.usage)]
     turns = backend.calls[0][1]
@@ -44,7 +48,7 @@ async def test_reply_writes_both_books_and_titles_the_conversation(
     )
 
 
-async def test_wholesale_sync_fills_pending_costs(
+async def test_network_cost_is_read_from_the_engine_every_time(
     application: Application, store: MemoryStore, backend: ScriptedBackend
 ) -> None:
     user = await application.auth.signup(NewUser(email="b@example.com", password="correct horse"))
@@ -52,47 +56,46 @@ async def test_wholesale_sync_fills_pending_costs(
     events = await collect(application.chat.start_reply(user, conversation.id, NewMessage(content="hi")))
     job_id = events[-1].message.job_id  # type: ignore[union-attr]
     assert job_id is not None
-    assert await application.chat.sync_wholesale() == 0  # still pending at the engine
-    backend.costs[job_id] = WholesaleCost(status="none")  # the engine's "not yet known" for ~16 s after a job
-    assert await application.chat.sync_wholesale() == 0
-    assert len(await store.pending_wholesale()) == 1
+
+    async def shown() -> WholesaleCost:
+        (message,) = await application.network.with_costs(
+            user.id, [m for m in await store.list_messages(conversation.id) if m.role == "assistant"]
+        )
+        assert message.wholesale is not None
+        return message.wholesale
+
+    assert (await shown()).status == "pending"  # the engine has not seen the usage yet
     backend.costs[job_id] = WholesaleCost(status="delivered", amount=Money(amount=Decimal("0.000111")))
-    assert await application.chat.sync_wholesale() == 1
-    message = await store.get_message(events[-1].message.id)  # type: ignore[union-attr]
-    assert message is not None and message.wholesale is not None
-    assert message.wholesale.status == "delivered"
-    assert message.wholesale.amount == Money(amount=Decimal("0.000111"))
-    assert message.wholesale.orchestrator_url == "https://orch.test:8935"  # kept from the reply
-    # the engine corrects the cost as more usage rows arrive; within the settle window we pick it up
+    assert (await shown()).amount == Money(amount=Decimal("0.000111"))
     backend.costs[job_id] = WholesaleCost(status="delivered", amount=Money(amount=Decimal("0.000222")))
-    assert await application.chat.sync_wholesale() == 1
-    assert await application.chat.sync_wholesale() == 0  # unchanged: nothing rewritten
-    application.clock.advance(minutes=11)  # type: ignore[attr-defined]
-    backend.costs[job_id] = WholesaleCost(status="delivered", amount=Money(amount=Decimal("0.000333")))
-    assert await application.chat.sync_wholesale() == 0  # settled: no longer polled
-    corrected = await store.get_message(events[-1].message.id)  # type: ignore[union-attr]
-    assert (
-        corrected is not None and corrected.wholesale is not None and corrected.wholesale.amount is not None
-    )
-    assert corrected.wholesale.amount.amount == Decimal("0.000222")
-    totals = await store.totals(
-        user.id, application.clock.now().replace(day=1), application.clock.now().replace(day=28)
-    )
-    assert (
-        totals.wholesale.amount == Decimal("0.000222") and totals.wholesale_pending == 0
-    )  # the corrected figure
+    assert (await shown()).amount == Money(amount=Decimal("0.000222"))  # a correction shows at once
+    month = (application.clock.now().replace(day=1), application.clock.now().replace(day=28))
+    totals = await application.network.user_totals(user.id, *month)
+    assert totals.wholesale.amount == Decimal("0.000222") and totals.wholesale_pending == 0
+    assert totals.retail.amount > 0 and totals.replies == 1  # retail still comes from the ledger
+    backend.unknown.add(job_id)  # the engine's database was reset
+    assert (await shown()).status == "unknown"  # never shown as $0
 
 
-async def test_failure_after_payment_marks_the_reply_and_keeps_wholesale_pending(
+async def test_a_failed_paid_reply_keeps_its_job_and_its_network_cost_counts(
     application: Application, store: MemoryStore, backend: ScriptedBackend
 ) -> None:
     user = await application.auth.signup(NewUser(email="c@example.com", password="correct horse"))
     conversation = await application.conversations.create(user)
-    backend.fail_with = ReplyFailed("runner 502", payment_sent=True, uncertain=True)
+    job_id = uuid4()
+    backend.owners[job_id] = user.id
+    backend.fail_with = ReplyFailed("runner 502", payment_sent=True, uncertain=True, job_id=job_id)
     events = await collect(application.chat.start_reply(user, conversation.id, NewMessage(content="hi")))
     assert events[-1].type == "error" and "runner 502" in (events[-1].error or "")
     reply = next(m for m in await store.list_messages(conversation.id) if m.role == "assistant")
-    assert reply.state == "uncertain" and reply.wholesale == WholesaleCost.pending()
+    assert reply.state == "uncertain" and reply.job_id == job_id and reply.wholesale is None
+    assert len(store.records) == 0  # no retail: nothing usable was delivered
+    backend.costs[job_id] = WholesaleCost(status="uncertain", amount=Money(amount=Decimal("0.0001")))
+    (shown,) = await application.network.with_costs(user.id, [reply])
+    assert shown.wholesale is not None and shown.wholesale.status == "uncertain"
+    month = (application.clock.now().replace(day=1), application.clock.now().replace(day=28))
+    totals = await application.network.user_totals(user.id, *month)
+    assert totals.wholesale_failed.amount == Decimal("0.0001") and totals.wholesale.amount == 0
 
 
 async def test_unavailable_backend_refuses_before_any_message_is_stored(

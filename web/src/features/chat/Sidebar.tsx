@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { formatMoney } from "@/features/usage/format";
+import { formatMoney, networkSpent } from "@/features/usage/format";
 import { cn } from "@/lib/utils";
 
 function groupLabel(iso: string): string {
@@ -105,7 +105,7 @@ export function Sidebar() {
       <div className="border-t p-2">
         {usage.data && (
           <div className="mb-2 px-2 text-xs text-muted-foreground" title="This month: retail at list price vs. what the Livepeer network charged">
-            This month · retail {formatMoney(usage.data.retail, { compact: true })} · network {formatMoney(usage.data.wholesale, { compact: true })}
+            This month · retail {formatMoney(usage.data.retail, { compact: true })} · network {formatMoney(networkSpent(usage.data), { compact: true })}
             {usage.data.wholesale_pending > 0 && ` (+${usage.data.wholesale_pending} pending)`}
           </div>
         )}

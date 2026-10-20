@@ -83,10 +83,14 @@ def chat_router(app: Application, current_user: Callable[[Request], Awaitable[Us
     @router.get("/conversations/{conversation_id}", response_model=ConversationOut)
     async def get_conversation(conversation_id: UUID, user: Current) -> ConversationOut:
         conversation = await app.conversations.get(user, conversation_id)
+        messages = await app.network.with_costs(
+            user.id, await app.conversations.messages(user, conversation_id)
+        )
+        retail = await app.store.conversation_totals(conversation_id)
         return ConversationOut(
             conversation=conversation,
-            messages=await app.conversations.messages(user, conversation_id),
-            totals=await app.store.conversation_totals(conversation_id),
+            messages=messages,
+            totals=app.network.conversation_totals(retail, messages),
         )
 
     @router.patch("/conversations/{conversation_id}", response_model=Conversation)
@@ -145,7 +149,7 @@ def chat_router(app: Application, current_user: Callable[[Request], Awaitable[Us
     @router.get("/usage/me", response_model=UsageTotals)
     async def my_usage(user: Current) -> UsageTotals:
         start, end = month_bounds(app.clock.now().astimezone(UTC))
-        return await app.store.totals(user.id, start, end)
+        return await app.network.user_totals(user.id, start, end)
 
     return router
 

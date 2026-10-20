@@ -42,14 +42,20 @@ class PriceTable(Contract):
     observed_at: datetime
 
 
-WholesaleStatus = Literal["none", "pending", "delivered", "failed_after_payment", "uncertain"]
+# "unknown": the engine has no record of the job (its database was reset). Shown as unknown, never $0.
+WholesaleStatus = Literal["none", "pending", "delivered", "failed_after_payment", "uncertain", "unknown"]
 
 
 class WholesaleCost(Contract):
-    """The engine's network cost for one job. ``none`` means the job never reached payment."""
+    """The network cost of one job, read from the engine each time it is shown, never stored (D29).
+
+    ``none`` means no attempt was paid: a settled $0. ``pending`` means the engine has not seen the
+    usage yet. The amount is present for ``none`` (zero), ``delivered``, ``failed_after_payment`` and
+    ``uncertain``.
+    """
 
     status: WholesaleStatus
-    amount: Money | None = None  # present only when status is delivered, failed_after_payment or uncertain
+    amount: Money | None = None
     orchestrator_url: str | None = None
     updated_at: datetime | None = None
 
@@ -76,7 +82,7 @@ class ImagePriceTable(Contract):
 
 
 class UsageRecord(Contract):
-    """One paid job's entry in the ledger: both books, one job id.
+    """One paid job's entry in the retail book; the network book is the engine's, joined by ``job_id`` (D29).
 
     ``message_id`` is the record key: the assistant message for a chat job, the image id for an
     image job (``kind``).
@@ -89,12 +95,21 @@ class UsageRecord(Contract):
     job_id: UUID | None
     usage: TokenUsage
     retail: Money
-    wholesale: WholesaleCost
     created_at: datetime
 
 
+class NetworkTotals(Contract):
+    """The engine's network spend over a period (D29). Pending jobs are counted, never folded in."""
+
+    delivered: Money
+    failed: Money  # failed after payment plus uncertain: paid, and no usable result
+    pending: int = 0
+
+
 class UsageTotals(Contract):
-    """Aggregates over a period. Pending wholesale rows are counted, never folded into the total."""
+    """Retail from the app's ledger, network from the engine (D29). Pending jobs are counted, never
+    folded into a total. ``wholesale`` is delivered spend; ``wholesale_failed`` is paid work that
+    gave no usable result."""
 
     user_id: UUID | None
     start: datetime
@@ -107,3 +122,4 @@ class UsageTotals(Contract):
     wholesale: Money
     wholesale_pending: int
     images: int = 0
+    wholesale_failed: Money = Money(amount=Decimal(0), currency="USD")

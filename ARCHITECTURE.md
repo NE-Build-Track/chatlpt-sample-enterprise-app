@@ -106,10 +106,11 @@ Each third-party package is confined to one module (enforced by `tests/structure
    `stream_options.include_usage` so the final chunk carries token counts.
 4. Chunks are forwarded to the browser as server-sent events **and** accumulated. If the browser
    disconnects, the service keeps consuming so the paid reply is still saved.
-5. On completion the assistant message is stored with the job id, token counts, the retail cost
-   computed from the price table, and wholesale cost `pending`.
-6. A background task asks the engine for the job's cost until it is `delivered`, then fills the
-   wholesale column. The engine is also told the token counts through `report_usage`.
+5. On completion the assistant message is stored with the job id, token counts and the retail cost
+   computed from the price table. A failed reply that was paid keeps its job id too. The engine is
+   told the token counts through `report_usage`.
+6. Network cost is never stored. `services/network.py` reads it from the engine whenever a message,
+   an image or a total is shown: `costs.for_job` per job and `costs.summary` per user (D29).
 
 When the model answers with a `generate_image` tool call instead of text, the same pipeline branches:
 the assistant message becomes a `tool_call` message, `services/images.py` runs the image app through the

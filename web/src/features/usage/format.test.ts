@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeWholesale, formatMoney, formatTokens } from "./format";
+import { describeWholesale, formatMoney, formatTokens, networkSpent } from "./format";
 
 describe("formatMoney", () => {
   it("shows sub-cent amounts with enough digits", () => {
@@ -19,6 +19,15 @@ describe("describeWholesale", () => {
       "network $0.0000300",
     );
     expect(describeWholesale(null).label).toBe("no network charge");
+    expect(describeWholesale({ status: "unknown" }).label).toBe("network unknown");
+  });
+});
+
+describe("networkSpent", () => {
+  it("adds failed paid work to delivered spend", () => {
+    const money = (amount: string) => ({ amount, currency: "USD" as const });
+    const totals = { wholesale: money("0.0003"), wholesale_failed: money("0.0001") };
+    expect(networkSpent(totals as never).amount).toBe("0.0004000000");
   });
 });
 

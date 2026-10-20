@@ -9,6 +9,7 @@ streaming. The runtime picks the first when the engine offers ``jobs.stream``.
 import json
 import logging
 from collections.abc import AsyncIterator, Sequence
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -16,6 +17,7 @@ from uuid import UUID
 from livepeer_builder import (
     ActorContext,
     BuilderEngine,
+    CostSummary,
     JobCost,
     JobFailed,
     JobRequest,
@@ -35,6 +37,7 @@ from chatlpt.contracts import (
     ChatTurn,
     ModelInfo,
     Money,
+    NetworkTotals,
     ReplyChunk,
     TokenUsage,
     ToolSpec,
@@ -196,6 +199,14 @@ class BufferedEngineChat:
             raise ChatUnavailable(str(exc)) from exc
         return wholesale_from(cost)
 
+    async def network_totals(self, user_id: UUID, start: datetime, end: datetime) -> NetworkTotals:
+        """The engine's cost summary for this user's jobs created in [start, end) (D29)."""
+        try:
+            summary = await self._engine.costs.summary(actor_for(user_id), start, end)
+        except EngineError as exc:
+            raise ChatUnavailable(str(exc)) from exc
+        return network_totals_from(summary)
+
     async def report_usage(self, user_id: UUID, job_id: UUID, usage: TokenUsage) -> None:
         quantities = {
             "prompt_tokens": usage.prompt_tokens,
@@ -329,13 +340,14 @@ def _finish_reason(event: dict[str, Any]) -> str | None:
 
 def failure_from(exc: JobFailed) -> ChatUnavailable | ReplyFailed:
     failure = exc.job.failure
+    job_id = exc.job.id if isinstance(exc.job.id, UUID) else None
     if failure is None:
-        return ReplyFailed(str(exc), payment_sent=False)
+        return ReplyFailed(str(exc), payment_sent=False, job_id=job_id)
     if failure.kind in _UNAVAILABLE_KINDS:
         return ChatUnavailable(failure.message)
     uncertain = failure.kind in ("timeout", "abandoned") or exc.job.state == "uncertain"
     detail = failure.message if not failure.body else f"{failure.message}: {failure.body[:300]}"
-    return ReplyFailed(detail, payment_sent=failure.payment_sent, uncertain=uncertain)
+    return ReplyFailed(detail, payment_sent=failure.payment_sent, uncertain=uncertain, job_id=job_id)
 
 
 def parse_completion(data: dict[str, Any]) -> list[ReplyChunk]:
@@ -383,9 +395,12 @@ def parse_usage(raw: object) -> TokenUsage | None:
 
 
 def wholesale_from(cost: JobCost) -> WholesaleCost:
-    """The engine's JobCost → the wholesale book entry. ``none`` never means free."""
+    """The engine's JobCost → the network cost shown for one job (D29).
+
+    ``none`` is the engine's "no attempt was paid": a settled $0 (D29), not "not yet known".
+    """
     if cost.status == "none":
-        return WholesaleCost(status="none")
+        return WholesaleCost(status="none", amount=Money(amount=Decimal(0), currency="USD"))
     if cost.status == "pending":
         return WholesaleCost.pending()
     classes = {attempt.cost_class for attempt in cost.attempts}
@@ -398,3 +413,19 @@ def wholesale_from(cost: JobCost) -> WholesaleCost:
     )
     amount = None if cost.fees.fee_usd is None else Money(amount=Decimal(cost.fees.fee_usd), currency="USD")
     return WholesaleCost(status=status, amount=amount, updated_at=cost.updated_at)
+
+
+def network_totals_from(summary: CostSummary) -> NetworkTotals:
+    """Delivered spend, failed spend (failed after payment plus uncertain) and jobs still pending."""
+
+    def usd(*classes: str) -> Money:
+        total = sum(
+            (Decimal(summary.by_class[c].fee_usd or 0) for c in classes if c in summary.by_class), Decimal(0)
+        )
+        return Money(amount=total, currency="USD")
+
+    return NetworkTotals(
+        delivered=usd("delivered"),
+        failed=usd("failed_after_payment", "uncertain"),
+        pending=summary.jobs_pending,
+    )

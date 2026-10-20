@@ -66,9 +66,6 @@ messages = Table(
     Column("reasoning_tokens", Integer, nullable=True),
     Column("cached_prompt_tokens", Integer, nullable=True),
     Column("retail_usd", String(DEC), nullable=True),
-    Column("wholesale_status", String(24), nullable=True),
-    Column("wholesale_usd", String(DEC), nullable=True),
-    Column("wholesale_updated_at", DateTime(timezone=True), nullable=True),
     Column("finish_reason", String(32), nullable=True),
     Column("continues_message_id", String(ID), nullable=True),
     Column("dropped_turns", Integer, nullable=True),
@@ -77,7 +74,8 @@ messages = Table(
     Index("ix_messages_conversation_created", "conversation_id", "created_at"),
 )
 
-# The ledger outlives conversations (deleting a chat keeps its usage), so no foreign keys here.
+# The retail ledger outlives conversations (deleting a chat keeps its usage), so no foreign keys here.
+# Network cost is not stored: it is read from the engine by job_id (D29).
 usage_records = Table(
     "usage_records",
     metadata,
@@ -91,14 +89,9 @@ usage_records = Table(
     Column("reasoning_tokens", Integer, nullable=False, server_default="0"),
     Column("cached_prompt_tokens", Integer, nullable=False, server_default="0"),
     Column("retail_usd", String(DEC), nullable=False),
-    Column("wholesale_status", String(24), nullable=False),
-    Column("wholesale_usd", String(DEC), nullable=True),
-    Column("wholesale_orchestrator_url", String(255), nullable=True),
-    Column("wholesale_updated_at", DateTime(timezone=True), nullable=True),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Index("ix_usage_user_created", "user_id", "created_at"),
     Index("ix_usage_conversation", "conversation_id"),
-    Index("ix_usage_wholesale_status", "wholesale_status"),
 )
 
 images = Table(
@@ -119,9 +112,6 @@ images = Table(
     Column("job_id", String(ID), nullable=True),
     Column("orchestrator_url", String(255), nullable=True),
     Column("retail_usd", String(DEC), nullable=True),
-    Column("wholesale_status", String(24), nullable=True),
-    Column("wholesale_usd", String(DEC), nullable=True),
-    Column("wholesale_updated_at", DateTime(timezone=True), nullable=True),
     Column("expired_at", DateTime(timezone=True), nullable=True),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Index("ix_images_message", "message_id"),

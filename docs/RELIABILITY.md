@@ -60,6 +60,8 @@ the login page with a reason (`?error=cancelled`, `expired`, `mismatch`, `provid
 ## Data
 
 Two SQLite files on the `/data` volume: `chatlpt.db` and `livepeer-builder.db`, both in WAL mode.
+The network book lives only in `livepeer-builder.db` (D29): back both up together, and keep the
+engine's retention (`LPB_RETENTION_*`) off, or old replies lose their network cost.
 Back up by copying both while stopped, or with `sqlite3 .backup`. Alembic migrations run at startup
 (`CHATLPT_AUTO_MIGRATE`, default on) or explicitly with `chatlpt migrate`.
 
@@ -69,7 +71,8 @@ Back up by copying both while stopped, or with `sqlite3 .backup`. Alembic migrat
 | --- | --- |
 | No ready runner | "The model is not available right now." Retry later. |
 | Payment refused everywhere (allowance exhausted) | "The service's network allowance is exhausted." Admin funds the allocation. |
-| Timeout after payment | The reply is marked uncertain; wholesale cost may still arrive. |
+| Timeout after payment | The reply is marked uncertain; its network cost shows once the engine has it, and counts as failed network spend. |
+| The engine's database was reset | Old replies show "network unknown", never $0 (D29). |
 | Engine not configured (dev without the stack) | `/readyz` degraded; chat disabled with a banner. |
 
 ## Per-worktree boot

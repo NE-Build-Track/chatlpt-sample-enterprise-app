@@ -40,7 +40,6 @@ from chatlpt.services.context import TURN_OVERHEAD_TOKENS, ContextService
 from chatlpt.services.conversations import NEW_TITLE, ConversationService, title_from
 from chatlpt.services.history import GENERATE_IMAGE, chain_text, turns_from
 from chatlpt.services.images import ImageService
-from chatlpt.services.wholesale import WholesaleSync
 from chatlpt.utils import estimate_tokens, new_id
 
 _LOG = logging.getLogger(__name__)
@@ -73,7 +72,6 @@ class ChatService:
         params: ChatParams,
         thinking_budgets: ThinkingBudgets,
         history_turn_limit: int,
-        wholesale_settle_window: timedelta = timedelta(minutes=10),
     ) -> None:
         self._store = store
         self._ledger = ledger
@@ -86,7 +84,6 @@ class ChatService:
         self._params = params
         self._budgets = thinking_budgets
         self._history_limit = history_turn_limit
-        self._wholesale = WholesaleSync(ledger, backend, clock, settle_window=wholesale_settle_window)
         self._tasks: set[asyncio.Task[None]] = set()
 
     # -- entry points -------------------------------------------------------------------------------
@@ -253,7 +250,7 @@ class ChatService:
                     "reasoning": "".join(reasoning) or None,
                     "state": "uncertain" if error.uncertain else "failed",
                     "error": str(error),
-                    "wholesale": WholesaleCost.pending() if error.payment_sent else None,
+                    "job_id": error.job_id,  # its network cost is read from the engine like any other (D29)
                 }
             )
             await self._store.update_message(failed)
@@ -382,7 +379,6 @@ class ChatService:
         now = self._clock.now()
         thinking = bool(reasoning) or (usage is not None and usage.reasoning_tokens > 0)
         retail = None if usage is None else self._billing.retail(usage, thinking=thinking)
-        wholesale = WholesaleCost.pending() if job_id is not None else WholesaleCost(status="none")
         final = placeholder.model_copy(
             update={
                 "content": content,
@@ -393,7 +389,6 @@ class ChatService:
                 "usage": usage,
                 "retail": retail,
                 "finish_reason": finish_reason,
-                "wholesale": wholesale.model_copy(update={"orchestrator_url": orchestrator_url}),
             }
         )
         await self._store.update_message(final)
@@ -407,7 +402,6 @@ class ChatService:
                     job_id=job_id,
                     usage=usage,
                     retail=retail,
-                    wholesale=final.wholesale or wholesale,
                     created_at=now,
                 )
             )
@@ -430,11 +424,12 @@ class ChatService:
                 "continues": None if final.continues_message_id is None else str(final.continues_message_id),
             },
         )
-        return final
-
-    async def sync_wholesale(self) -> int:
-        """Fill wholesale costs that arrived (docs: services/wholesale.py). Returns the number filled."""
-        return await self._wholesale.sync_once()
+        if job_id is None:
+            return final
+        # Just finished, so the engine has not seen the usage yet. Shown, never stored (D29).
+        return final.model_copy(
+            update={"wholesale": WholesaleCost(status="pending", orchestrator_url=orchestrator_url)}
+        )
 
     async def drain(self) -> None:
         """Wait for in-flight replies (shutdown)."""

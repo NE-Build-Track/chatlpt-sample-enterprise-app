@@ -4,12 +4,18 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
-from livepeer_builder.contracts import Failure, Job
+from livepeer_builder.contracts import CostSummary, Failure, Job
 from livepeer_builder.contracts.costs import AttemptCost, Fees, JobCost
 from livepeer_builder.errors import JobFailed
 
-from chatlpt.adapters.engine import failure_from, parse_completion, parse_usage, wholesale_from
-from chatlpt.contracts import ReplyChunk, TokenUsage
+from chatlpt.adapters.engine import (
+    failure_from,
+    network_totals_from,
+    parse_completion,
+    parse_usage,
+    wholesale_from,
+)
+from chatlpt.contracts import Money, ReplyChunk, TokenUsage
 from chatlpt.errors import ChatUnavailable, ReplyFailed
 
 COMPLETION = {
@@ -52,14 +58,15 @@ def test_parse_completion_tolerates_a_bare_or_odd_body() -> None:
     assert parse_usage(None) is None
 
 
-def test_wholesale_from_never_turns_missing_into_zero() -> None:
+def test_wholesale_from_maps_none_to_a_settled_zero_and_pending_to_pending() -> None:
     now = datetime.now(UTC)
     job_id = uuid4()
     none = JobCost(
         job_id=job_id, status="none", fees=Fees(), attempts=(), first_observed_at=None, updated_at=None
     )
     pending = none.model_copy(update={"status": "pending"})
-    assert wholesale_from(none).status == "none" and wholesale_from(none).amount is None
+    # builder-core's "none" means no attempt was paid: $0, settled (D29). Pending is still unknown.
+    assert wholesale_from(none).status == "none" and wholesale_from(none).amount == Money(amount=Decimal(0))
     assert wholesale_from(pending).status == "pending" and wholesale_from(pending).amount is None
     observed = JobCost(
         job_id=job_id,
@@ -108,3 +115,22 @@ def test_failure_mapping_distinguishes_unavailable_from_failed_after_payment() -
     assert isinstance(error, ReplyFailed) and error.payment_sent and not error.uncertain
     timeout = failure_from(_failed_job("timeout", payment_sent=True, state="uncertain"))
     assert isinstance(timeout, ReplyFailed) and timeout.uncertain
+
+
+def test_network_totals_split_delivered_from_failed_spend() -> None:
+    now = datetime.now(UTC)
+    summary = CostSummary(
+        start=now,
+        end=now,
+        by_class={
+            "delivered": Fees(fee_eth=Decimal(1), fee_usd=Decimal("0.0003"), row_count=3),
+            "failed_after_payment": Fees(fee_eth=Decimal(1), fee_usd=Decimal("0.0001"), row_count=1),
+            "uncertain": Fees(fee_eth=Decimal(1), fee_usd=Decimal("0.0002"), row_count=1),
+            "pending": Fees(),
+        },
+        jobs_with_cost=5,
+        jobs_pending=2,
+    )
+    totals = network_totals_from(summary)
+    assert totals.delivered == Money(amount=Decimal("0.0003"))
+    assert totals.failed == Money(amount=Decimal("0.0003")) and totals.pending == 2

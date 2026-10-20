@@ -16,6 +16,7 @@ from chatlpt.contracts import (
     ImagePriceTable,
     Message,
     ModelInfo,
+    NetworkTotals,
     OAuthIdentity,
     OAuthProviderName,
     PriceTable,
@@ -121,15 +122,9 @@ class ConversationStore(Protocol):
 
 
 class UsageLedger(Protocol):
+    """The retail book. Its totals carry zero network cost; the engine owns that book (D29)."""
+
     async def record(self, record: UsageRecord) -> None: ...
-
-    async def update_wholesale(self, message_id: UUID, wholesale: WholesaleCost) -> None: ...
-
-    # paid jobs whose wholesale cost is still "pending" or "none" (the engine's "not yet known"), plus
-    # those filled since ``settling_since``: the engine corrects a cost as more usage rows arrive
-    async def pending_wholesale(
-        self, limit: int = 100, settling_since: datetime | None = None
-    ) -> list[UsageRecord]: ...
 
     async def totals(self, user_id: UUID | None, start: datetime, end: datetime) -> UsageTotals: ...
 
@@ -173,7 +168,9 @@ class ChatBackend(Protocol):
 
     async def model_info(self, user_id: UUID) -> ModelInfo: ...  # billed; cache it
 
-    async def wholesale(self, user_id: UUID, job_id: UUID) -> WholesaleCost: ...
+    async def wholesale(self, user_id: UUID, job_id: UUID) -> WholesaleCost: ...  # NotFound if unknown
+
+    async def network_totals(self, user_id: UUID, start: datetime, end: datetime) -> NetworkTotals: ...
 
     async def report_usage(self, user_id: UUID, job_id: UUID, usage: TokenUsage) -> None: ...
 

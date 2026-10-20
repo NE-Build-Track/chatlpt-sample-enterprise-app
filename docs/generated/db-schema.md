@@ -35,10 +35,6 @@ erDiagram
 | `reasoning_tokens` | INTEGER | no |  |
 | `cached_prompt_tokens` | INTEGER | no |  |
 | `retail_usd` | VARCHAR(64) | no |  |
-| `wholesale_status` | VARCHAR(24) | no |  |
-| `wholesale_usd` | VARCHAR(64) | yes |  |
-| `wholesale_orchestrator_url` | VARCHAR(255) | yes |  |
-| `wholesale_updated_at` | DATETIME | yes |  |
 | `created_at` | DATETIME | no |  |
 
 ## `users`
@@ -94,9 +90,6 @@ erDiagram
 | `reasoning_tokens` | INTEGER | yes |  |
 | `cached_prompt_tokens` | INTEGER | yes |  |
 | `retail_usd` | VARCHAR(64) | yes |  |
-| `wholesale_status` | VARCHAR(24) | yes |  |
-| `wholesale_usd` | VARCHAR(64) | yes |  |
-| `wholesale_updated_at` | DATETIME | yes |  |
 | `finish_reason` | VARCHAR(32) | yes |  |
 | `continues_message_id` | VARCHAR(36) | yes |  |
 | `dropped_turns` | INTEGER | yes |  |
@@ -122,8 +115,5 @@ erDiagram
 | `job_id` | VARCHAR(36) | yes |  |
 | `orchestrator_url` | VARCHAR(255) | yes |  |
 | `retail_usd` | VARCHAR(64) | yes |  |
-| `wholesale_status` | VARCHAR(24) | yes |  |
-| `wholesale_usd` | VARCHAR(64) | yes |  |
-| `wholesale_updated_at` | DATETIME | yes |  |
 | `expired_at` | DATETIME | yes |  |
 | `created_at` | DATETIME | no |  |

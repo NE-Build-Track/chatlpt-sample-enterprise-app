@@ -1,5 +1,7 @@
 """Application errors. Each maps to one HTTP status in chatlpt.http."""
 
+from uuid import UUID
+
 
 class AppError(Exception):
     """Base error."""
@@ -74,10 +76,13 @@ class ReplyFailed(AppError):
 
     status_code = 502
 
-    def __init__(self, message: str, *, payment_sent: bool, uncertain: bool = False) -> None:
+    def __init__(
+        self, message: str, *, payment_sent: bool, uncertain: bool = False, job_id: UUID | None = None
+    ) -> None:
         super().__init__(message)
         self.payment_sent = payment_sent
         self.uncertain = uncertain
+        self.job_id = job_id  # the engine job, so a failed paid reply still shows its network cost (D29)
 
 
 class NotImplementedYet(AppError):
