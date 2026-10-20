@@ -145,7 +145,7 @@ class ReplyStream(Protocol):
 
 
 class ChatBackend(Protocol):
-    """Everything the app asks of the model. Today buffered (v0.1.0), later streamed (D20)."""
+    """Everything the app asks of the model, buffered or streamed through the same port (D20)."""
 
     app: str  # the runner app, for example blueclaw/chat/qwen3.8-27b
 

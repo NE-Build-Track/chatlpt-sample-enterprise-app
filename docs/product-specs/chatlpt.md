@@ -82,4 +82,4 @@ Every assistant message records, and the UI shows:
   runs beside it from the same compose file (D10).
 - Python 3.12 with uv, FastAPI; React with shadcn/ui served as static files; SQLite for both the app
   and the embedded engine (D11).
-- builder-core pinned to `v0.1.0` until the streaming branch exists (D2).
+- builder-core pinned to the streaming branch until it merges, then to a release (D2).

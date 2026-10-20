@@ -14,7 +14,7 @@ flowchart TB
         PROV["protocols (ports)"]
         AD["adapters: engine, oauth, passwords, pricing"]
         ST["store: SQLite (chatlpt.db)"]
-        subgraph Engine["livepeer-builder (embedded, v0.1.0)"]
+        subgraph Engine["livepeer-builder (embedded, streaming branch)"]
             ENG["BuilderEngine: discovery, jobs, payments, costs"]
             EST["store: SQLite (livepeer-builder.db)"]
         end
@@ -94,8 +94,8 @@ Each third-party package is confined to one module (enforced by `tests/structure
 - The engine's discovery source is ours: it reads the signer's entries, keeps runners advertising the
   chat app on the approved orchestrators, hands the engine standard `Runner` contracts, and remembers the
   runner's `metadata` (`model_id`, `max_context`) for the context window.
-- Today (`v0.1.0`) a reply is `jobs.run` in immediate mode: one buffered body. The streaming design
-  replaces that with `jobs.stream`; only `adapters/engine.py` changes.
+- A reply is `jobs.stream` (D2, plan-06): SSE bytes as the runner produces them. Before 19 October it
+  was `jobs.run` in immediate mode (one buffered body); only `adapters/engine.py` changed.
 
 ## A reply, end to end
 

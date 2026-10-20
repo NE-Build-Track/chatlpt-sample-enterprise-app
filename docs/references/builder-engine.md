@@ -1,14 +1,15 @@
 # livepeer-builder (embedded)
 
 Pinned to branch **`tasks/m3/mz/stream-support`** of `NE-Build-Track/livepeer-builder-core` at commit
-`973ac57` (pushed 2026-10-19). Previously tag `v0.1.0` (commit `153f0de`). Source of truth: that repository's `ARCHITECTURE.md`, `docs/contracts/engine.md`,
+`a89216d` (2026-10-20: the stream lifecycle fixes, builder-core D34–D39). Before that `973ac57`
+(2026-10-19), and tag `v0.1.0` (commit `153f0de`). Source of truth: that repository's `ARCHITECTURE.md`, `docs/contracts/engine.md`,
 `docs/design-docs/extending-the-engine.md`.
 
 ## What we call
 
 | Need | Engine API | Notes |
 | --- | --- | --- |
-| Build and start | `BuilderEngine.from_settings(EngineSettings.from_env(), discovery_source=..., selection=...)`, `await engine.start()` | `LPB_*` variables; see [payment-stack](payment-stack.md) |
+| Build and start | `BuilderEngine.from_settings(EngineSettings.from_env(), discovery_source=...)`, `await engine.start()` | `LPB_*` variables; see [payment-stack](payment-stack.md) |
 | Who is calling | `ActorContext(actor_id, application_id="chatlpt", permissions={discover, jobs.run, jobs.read, costs.read})` | Built by our runtime; no engine key for users |
 | Offerings | `engine.discovery` snapshot / offerings | Filtered to the chat app on approved orchestrators |
 | A reply | `engine.jobs.stream(actor, JobRequest(app="blueclaw/chat/qwen3.8-27b", path="/v1/chat/completions", payload={..., "stream": true, "stream_options": {"include_usage": true}}, operation_ref=..., max_attempts=..., timeout_s=..., idle_timeout_s=...))` | A `JobStream` of SSE bytes; `jobs.run` remains the fallback for an engine without streaming |
@@ -21,6 +22,7 @@ Pinned to branch **`tasks/m3/mz/stream-support`** of `NE-Build-Track/livepeer-bu
 
 - **Results are inline only.** `GET /v1/jobs/{id}/result` is 501 until M4. Persist the reply before anything else.
 - **Streaming:** `jobs.stream` opens the paid call and yields bytes; a stream the app stops reading ends `abandoned` and the job `uncertain` (see [streaming design](../design-docs/streaming-through-the-engine.md)). `Runner` now carries `version`, `metadata` and `gpu`.
+- **Stream lifecycle (builder-core D34–D39, from `a89216d`):** the engine records a stream's end in its own task, so a cancelled reply still finishes its job and frees its slot. Deadlines: `timeout_s` from the job's start, `first_byte_timeout_s` (60 s default) to the first chunk, `idle_timeout_s` between chunks (we set it; the engine default is 60 s). `JobStream` supports `async with` and `complete()` (succeeded with the bytes so far); a cancelled reader gets `LPB_STREAM_SETTLE_S` (1 s) for the runner to finish. We read every stream to the end, so none of this changes our replies.
 - **Failover only before payment.** After payment the job is bound to a runner; a timeout leaves it `uncertain`.
 - **`per_application` mode** needs `LPB_SHARED_PAYMENT_KEY` and `LPB_SHARED_ALLOCATION_ID`; jobs still carry `actor_id`.
 - **`LPB_BATTERIES_OPERATOR_TOKEN` is required** when `LPB_BATTERIES_URL` is set, even if we never create grants from the app.

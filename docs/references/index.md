@@ -5,7 +5,7 @@ observed. Re-check before relying on one.
 
 | Reference | What it records |
 | --- | --- |
-| [builder-engine.md](builder-engine.md) | What ChatLPT uses from `livepeer-builder` v0.1.0 in embedded mode |
+| [builder-engine.md](builder-engine.md) | What ChatLPT uses from `livepeer-builder` (streaming branch, D2) in embedded mode |
 | [qwen-runner.md](qwen-runner.md) | The `blueclaw/chat/qwen3.8-27b` vLLM runner: endpoints, streaming, usage, reasoning |
 | [qwen-pricing.md](qwen-pricing.md) | Alibaba Cloud list prices used for the retail book |
 | [fal-pricing.md](fal-pricing.md) | fal.ai list price for FLUX.1 [schnell], the retail book for images |
