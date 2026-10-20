@@ -1,7 +1,7 @@
 import { Link, NavLink, useNavigate, useParams } from "react-router";
 import { MoreHorizontal, Pencil, Plus, Shield, Trash2 } from "lucide-react";
 import { useMe, useLogout } from "@/api/auth";
-import { useConversations, useCreateConversation, useDeleteConversation, useRenameConversation, useMyUsage } from "@/api/conversations";
+import { useConversations, useDeleteConversation, useRenameConversation, useMyUsage } from "@/api/conversations";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -26,7 +26,6 @@ export function Sidebar() {
   const navigate = useNavigate();
   const { conversationId } = useParams();
   const conversations = useConversations();
-  const create = useCreateConversation();
   const rename = useRenameConversation();
   const remove = useDeleteConversation();
   const usage = useMyUsage();
@@ -37,9 +36,8 @@ export function Sidebar() {
     groups.set(label, [...(groups.get(label) ?? []), c]);
   }
 
-  async function onNew() {
-    const c = await create.mutateAsync();
-    navigate(`/c/${c.id}`);
+  function onNew() {
+    navigate("/"); // the welcome screen; the conversation is created with its first message
   }
 
   async function onRename(id: string, current: string) {
@@ -56,7 +54,7 @@ export function Sidebar() {
   return (
     <div className="flex h-full flex-col">
       <div className="p-2">
-        <Button variant="outline" className="w-full justify-start gap-2" onClick={onNew} disabled={create.isPending}>
+        <Button variant="outline" className="w-full justify-start gap-2" onClick={onNew}>
           <Plus className="size-4" /> New chat
         </Button>
       </div>

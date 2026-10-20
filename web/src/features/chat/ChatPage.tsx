@@ -10,6 +10,7 @@ import { Composer } from "./Composer";
 import { MessageItem } from "./MessageItem";
 import { formatMoney, networkSpent } from "@/features/usage/format";
 import { ThinkingSelect } from "./ThinkingSelect";
+import { Welcome } from "./Welcome";
 
 type Live = { message: Message; content: string; reasoning: string };
 
@@ -122,6 +123,11 @@ export function ChatPage() {
       )}
       <div className="min-h-0 flex-1 overflow-y-auto px-4">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 py-6">
+          {conversation.data && messages.length === 0 && !busy && !error && (
+            <div className="flex min-h-[60dvh]">
+              <Welcome onPick={send} disabled={model.data?.chat_available === false} />
+            </div>
+          )}
           {messages
             .filter((m) => !(live && m.id === live.message.id))
             .map((m, index, all) => (
