@@ -1,8 +1,8 @@
 # Streaming through the engine
 
-Status: **proposed** for builder-core on branch `tasks/m3/mz/stream-support` off `releases/m3`. The
-exec plan that carries the work is `docs/exec-plans/active/streaming-jobs.md` on that branch (drafted
-2026-10-19, awaiting review). This document is the design as ChatLPT needs it. ChatLPT is the first
+Status: **implemented** in builder-core on branch `tasks/m3/mz/stream-support` off `releases/m3`
+(2026-10-19, with the lifecycle fixes D34–D39 on 2026-10-20 at `a89216d`, which ChatLPT pins, D2);
+awaiting review and merge. The exec plan is `docs/exec-plans/active/streaming-jobs.md` on that branch. This document is the design as ChatLPT needs it. ChatLPT is the first
 consumer, but nothing here is specific to chat.
 
 ## Problem

@@ -43,7 +43,11 @@ coding agents.
 - The conversation title is the first user message, trimmed. No extra paid call (D16).
 - History sent to the model is truncated to fit the runner's context window, derived from the
   model's own `max_model_len` (D14). The system prompt, temperature and output cap are settings.
-- Users can rename and delete conversations. Deleting removes the messages; usage records remain.
+- **New chat** opens the welcome screen; a conversation is created with its first message.
+- Users can rename and delete conversations, one at a time from each chat's "…" menu, or in bulk from
+  the profile menu ("Delete chats…": older than 30 days, older than 90 days, or all, by last
+  activity, with a confirmation). Deleting removes the messages; usage records remain.
+- On a phone the sidebar is a slide-in drawer opened from the header button.
 
 - **Images are model-driven** (D25): the assistant is offered a `generate_image` tool and decides when
   to draw; the app runs `comfystream/fal-flux-schnell` through the engine, stores the file on the
@@ -63,7 +67,8 @@ Every assistant message records, and the UI shows:
 - The price table lives in the repository with its source URL and the date observed
   ([qwen-pricing](../references/qwen-pricing.md)). Input, cached input, output and thinking-mode
   output are priced separately.
-- A conversation shows its running totals. A user's page shows their totals for the month.
+- A conversation shows its running totals. **Usage** in the profile menu shows the user's totals for
+  the month: replies, images, tokens, retail, and network delivered, failed and total.
 - Wholesale is never guessed from retail or the other way around.
 
 ### Admin

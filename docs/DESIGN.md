@@ -3,8 +3,9 @@
 ChatLPT should be recognizable to anyone who has used ChatGPT.
 
 - **Layout:** a collapsible left sidebar (new chat, conversation list grouped by day, user menu at
-  the bottom); a centered column of messages with a max width of about 48rem; a floating composer at
-  the bottom with a stop button while streaming.
+  the bottom with Usage, Delete chats…, Admin and Log out); below 768 px the same sidebar is a
+  slide-in drawer. A centered column of messages with a max width of about 48rem; a floating composer
+  at the bottom with a stop button while streaming. An empty chat shows the welcome screen.
 - **Messages:** user turns in a subtle bubble aligned right; assistant turns plain, full width,
   Markdown with syntax-highlighted code blocks and a copy button. A collapsible **Thinking** block
   above an assistant turn when reasoning was returned.
