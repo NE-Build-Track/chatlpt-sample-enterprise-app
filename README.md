@@ -75,7 +75,7 @@ Each is a numbered decision in [docs/design-docs/decisions.md](docs/design-docs/
 | Assumption | Decision |
 | --- | --- |
 | Streaming is required, and is designed generically for builder-core, not patched into this app | D1, D20 |
-| builder-core is pinned to the streaming branch `tasks/m3/mz/stream-support` at `93756ba` | D2 |
+| builder-core is pinned to `releases/m3` at `ad6bba9`, the merge of the streaming work | D2 |
 | One shared application payment key; the app tracks tokens per user; both books are kept | D3 |
 | Retail prices are Alibaba Cloud's international list prices for Qwen3.8-27B, recorded in-repo with a date | D4 |
 | Email/password accounts in SQLite, self-signup open; Google (OIDC) and GitHub (OAuth 2.0) optional | D5, D6 |
@@ -195,11 +195,11 @@ Everything is an environment variable; `deploy/.env.example` lists each with its
 
 ## Streaming
 
-Replies stream token by token through the engine's `jobs.stream`, from builder-core branch
-`tasks/m3/mz/stream-support` (the generic design is in
+Replies stream token by token through the engine's `jobs.stream`, from builder-core `releases/m3`
+(the generic design is in
 [docs/design-docs/streaming-through-the-engine.md](docs/design-docs/streaming-through-the-engine.md)).
 The buffered adapter remains for an engine without `jobs.stream`; it still needs an engine that accepts
-`idle_timeout_s` (the pinned branch onward), so it is not a fallback to `v0.1.0`.
+`idle_timeout_s` (the pinned commit onward), so it is not a fallback to `v0.1.0`.
 
 ## Working in this repository
 
