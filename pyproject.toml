@@ -22,9 +22,9 @@ dependencies = [
     "argon2-cffi>=23.1",
     "authlib>=1.3",
     "httpx>=0.27",
-    # D2: the streaming branch tasks/m3/mz/stream-support at a89216d, with the stream lifecycle fixes D34-D39
+    # D2: the streaming branch tasks/m3/mz/stream-support at 93756ba, with the stream lifecycle fixes D34-D40
     # (docs/design-docs/decisions.md). Re-pin to the merge commit on releases/m3, then to a release tag.
-    "livepeer-builder @ git+https://github.com/NE-Build-Track/livepeer-builder-core.git@a89216db9399738cb96fdca21b72c99d51a89c32",
+    "livepeer-builder @ git+https://github.com/NE-Build-Track/livepeer-builder-core.git@93756ba2755b422031526e0dec7cf87d59f7e161",
 ]
 
 [project.scripts]
