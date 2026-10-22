@@ -22,9 +22,9 @@ dependencies = [
     "argon2-cffi>=23.1",
     "authlib>=1.3",
     "httpx>=0.27",
-    # D2: releases/m3 at ad6bba9, the merge of PR #28 (streaming, D34-D40) and PR #31 (gateway 3238731, D41)
-    # (docs/design-docs/decisions.md). Re-pin to a release tag once one is cut.
-    "livepeer-builder @ git+https://github.com/NE-Build-Track/livepeer-builder-core.git@ad6bba98dd0cb068924fa63b2cd552b135068bbb",
+    # D2: builder-core PR #40 (tasks/m3/cost-attribution) at 877d61d: #33, D42 and cost attribution
+    # gaps, on releases/m3 after PR #36 (docs/design-docs/decisions.md). Re-pin to releases/m3 once it merges.
+    "livepeer-builder @ git+https://github.com/NE-Build-Track/livepeer-builder-core.git@877d61dcbbf295a8490b418c554e946e94d2da7d",
 ]
 
 [project.scripts]

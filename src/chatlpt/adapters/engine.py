@@ -27,6 +27,7 @@ from livepeer_builder import (
     OperationExists,
     ProviderUnavailable,
 )
+from livepeer_builder.contracts import CostClass
 from livepeer_builder.errors import EngineError
 from livepeer_builder.errors import NotFound as EngineNotFound
 
@@ -418,14 +419,14 @@ def wholesale_from(cost: JobCost) -> WholesaleCost:
 def network_totals_from(summary: CostSummary) -> NetworkTotals:
     """Delivered spend, failed spend (failed after payment plus uncertain) and jobs still pending."""
 
-    def usd(*classes: str) -> Money:
+    def usd(*classes: CostClass) -> Money:
         total = sum(
             (Decimal(summary.by_class[c].fee_usd or 0) for c in classes if c in summary.by_class), Decimal(0)
         )
         return Money(amount=total, currency="USD")
 
     return NetworkTotals(
-        delivered=usd("delivered"),
-        failed=usd("failed_after_payment", "uncertain"),
+        delivered=usd(CostClass.DELIVERED),
+        failed=usd(CostClass.FAILED_AFTER_PAYMENT, CostClass.UNCERTAIN),
         pending=summary.jobs_pending,
     )
