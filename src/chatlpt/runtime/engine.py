@@ -2,7 +2,7 @@
 
 import logging
 
-from livepeer_builder import BuilderEngine, EngineSettings
+from livepeer_builder import BuilderEngine, EngineSettings, EngineSupply
 
 from chatlpt.adapters.discovery import FilteredSignerDiscovery
 from chatlpt.protocols import Clock
@@ -24,7 +24,7 @@ async def build_engine(
         hosts=approved_hosts,
         clock=clock,
     )
-    engine = await BuilderEngine.from_settings(settings, discovery_source=source)
+    engine = await BuilderEngine.create(settings, supply=EngineSupply(discovery_source=source))
     _LOG.info(
         "engine built",
         extra={

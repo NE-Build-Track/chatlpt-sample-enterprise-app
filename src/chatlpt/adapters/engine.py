@@ -1,9 +1,9 @@
 """The ChatBackend over the embedded livepeer-builder engine (docs/references/builder-engine.md).
 
-Two implementations of the same port (D20): ``StreamingEngineChat`` uses the engine's ``jobs.stream``
+Two implementations of the same port (D20): ``StreamingEngineChat`` uses the engine's ``jobs.streaming``
 and yields reply deltas as the runner emits them (docs/design-docs/streaming-through-the-engine.md);
 ``BufferedEngineChat`` uses ``jobs.run`` and yields the whole body at the end, for an engine without
-streaming. The runtime picks the first when the engine offers ``jobs.stream``.
+streaming. The runtime picks the first when the engine offers ``jobs.streaming``.
 """
 
 import json
@@ -289,7 +289,26 @@ class StreamingReply:
 
 
 class StreamingEngineChat(BufferedEngineChat):
-    """``jobs.stream`` per reply: the browser sees tokens as the runner produces them (D1, D20)."""
+    """``jobs.streaming`` per reply: the browser sees tokens as the runner produces them (D1, D20).
+
+    Built only for an engine that offers the streaming capability; the runtime checks
+    ``engine.jobs.streaming`` and picks ``BufferedEngineChat`` otherwise.
+    """
+
+    def __init__(
+        self,
+        engine: BuilderEngine,
+        clock: Clock,
+        *,
+        app: str,
+        max_attempts: int = 3,
+        idle_timeout_s: float | None = None,
+    ) -> None:
+        super().__init__(engine, clock, app=app, max_attempts=max_attempts, idle_timeout_s=idle_timeout_s)
+        streaming = engine.jobs.streaming
+        if streaming is None:
+            raise ValueError("this engine's transport cannot stream; use BufferedEngineChat")
+        self._streaming = streaming
 
     async def open_reply(  # type: ignore[override]
         self,
@@ -301,7 +320,7 @@ class StreamingEngineChat(BufferedEngineChat):
     ) -> StreamingReply:
         request = self._request(turns, params, operation_ref, stream=True, tools=tools)
         try:
-            job_stream = await self._engine.jobs.stream(actor_for(user_id), request)
+            job_stream = await self._streaming.stream(actor_for(user_id), request)
         except JobFailed as exc:
             raise failure_from(exc) from exc
         except (NoCapacity, NotProvisioned, ProviderUnavailable) as exc:

@@ -92,6 +92,7 @@ class FakeJobs:
     def __init__(self, stream: FakeJobStream) -> None:
         self._stream = stream
         self.requests: list[JobRequest] = []
+        self.streaming = self
 
     async def stream(self, actor: Any, request: JobRequest) -> FakeJobStream:
         self.requests.append(request)
@@ -183,6 +184,10 @@ async def test_failure_mid_stream_surfaces_as_an_uncertain_reply() -> None:
 
 async def test_open_errors_map_like_the_buffered_adapter() -> None:
     class Refusing:
+        @property
+        def streaming(self) -> "Refusing":
+            return self
+
         async def stream(self, actor: Any, request: JobRequest) -> FakeJobStream:
             raise JobFailed(
                 FakeJobStream([]).job.model_copy(
@@ -198,3 +203,14 @@ async def test_open_errors_map_like_the_buffered_adapter() -> None:
 
     with pytest.raises(ChatUnavailable):
         await chat.open_reply(UUID(int=1), [ChatTurn(role="user", content="hi")], PARAMS, operation_ref="x")
+
+
+def test_the_streaming_adapter_refuses_an_engine_that_cannot_stream() -> None:
+    class Buffered:
+        streaming = None
+
+    class Engine:
+        jobs = Buffered()
+
+    with pytest.raises(ValueError, match="cannot stream"):
+        StreamingEngineChat(Engine(), FixedClock(), app=APP)  # type: ignore[arg-type]

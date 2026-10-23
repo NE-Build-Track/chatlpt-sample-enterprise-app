@@ -153,7 +153,7 @@ class Application:
             engine, metadata = built
             if settings.tools_enabled:
                 image_backend = EngineImages(engine, app=settings.image_app)
-            adapter = StreamingEngineChat if hasattr(engine.jobs, "stream") else BufferedEngineChat
+            adapter = StreamingEngineChat if engine.jobs.streaming is not None else BufferedEngineChat
             backend = adapter(
                 engine, clock, app=settings.chat_app, idle_timeout_s=settings.reply_idle_timeout_s
             )
