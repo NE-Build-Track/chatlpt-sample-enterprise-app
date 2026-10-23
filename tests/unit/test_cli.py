@@ -1,5 +1,6 @@
 """The operator CLI: secrets, migrations, revisions, generated docs and the smoke check."""
 
+import argparse
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -87,3 +88,32 @@ def test_make_admin_refuses_an_unverified_email_unless_told(
     assert main(["revoke-admin", "g@example.com"]) == 0
     assert json.loads(capsys.readouterr().out)["is_admin"] is False
     assert main(["make-admin", "nobody@example.com"]) == 1
+
+
+async def test_serve_stops_the_application_when_the_server_cannot_be_built(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import chatlpt.http
+    from chatlpt import cli
+    from chatlpt.runtime import Application
+
+    monkeypatch.setenv("CHATLPT_DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path}/serve.db")
+    monkeypatch.setenv("CHATLPT_PRICING_FILE", str(ROOT / "config" / "pricing" / "qwen3.8-27b.json"))
+    monkeypatch.setenv("CHATLPT_SESSION_SECRET", "s")
+    monkeypatch.delenv("LPB_SIGNER_URL", raising=False)
+    monkeypatch.delenv("LPB_DISCOVERY_URL", raising=False)
+    stopped: list[Application] = []
+    stop = Application.stop
+
+    async def recording_stop(self: Application) -> None:
+        stopped.append(self)
+        await stop(self)
+
+    def broken(app: Application) -> object:
+        raise ValueError("a bug in the routes")
+
+    monkeypatch.setattr(Application, "stop", recording_stop)
+    monkeypatch.setattr(chatlpt.http, "create_app", broken)
+    with pytest.raises(ValueError, match="routes"):
+        await cli._serve(argparse.Namespace())
+    assert len(stopped) == 1

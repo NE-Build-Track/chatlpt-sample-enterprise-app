@@ -34,7 +34,7 @@ changes beyond the refactor branch (its `FakeEngine` gaps found here were fixed 
 - [ ] No module or test imports `livepeer_gateway` or a non-public `livepeer_builder` module.
 - [ ] Outside the CLI's own tests (the CLI reads the environment by design), no test sets or deletes an
   `LPB_*` variable; only `config.py` reads the environment (a structural test).
-- [ ] A failure while building the application closes the store it opened (a failing-first test).
+- [x] A failure while building the application closes the store it opened (a failing-first test).
 - [ ] References (`builder-engine.md`, `payment-stack.md`, SECURITY, ARCHITECTURE, `.env.example`) and D2 updated.
 
 ## Progress
@@ -58,6 +58,11 @@ changes beyond the refactor branch (its `FakeEngine` gaps found here were fixed 
   added in builder-core with contract cases (`bdf2630`, `165e601`) and the pin moved to `165e601`.
   `tests/structure/test_engine_api.py` keeps every `livepeer_builder` import public; it failed first on
   six files importing `livepeer_builder.errors` and `.contracts`.
+- 2026-10-23: cleanup on failure. `Application.from_settings` puts the store and the engine on an exit
+  stack as they open, so a later failure (a missing pricing file) closes and stops them; `stop()` runs
+  every step and logs `app.stop_failed` for one that fails; `chatlpt serve` stops the application in a
+  `finally`, for a failure before the HTTP lifespan runs. Each behaviour failed its test first; stopping
+  twice is tested as harmless.
 
 ## Decision log
 

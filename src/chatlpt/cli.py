@@ -134,16 +134,19 @@ async def _serve(_: argparse.Namespace) -> None:
     settings = Settings.from_env()
     configure_logging(json_lines=settings.log_json)
     app = await Application.from_settings(settings, engine_settings_from_env())
-    server = uvicorn.Server(
-        uvicorn.Config(
-            create_app(app),
-            host=settings.http_host,
-            port=settings.http_port,
-            log_config=None,
-            access_log=False,
+    try:
+        server = uvicorn.Server(
+            uvicorn.Config(
+                create_app(app),
+                host=settings.http_host,
+                port=settings.http_port,
+                log_config=None,
+                access_log=False,
+            )
         )
-    )
-    await server.serve()
+        await server.serve()
+    finally:
+        await app.stop()  # the lifespan stops it too when the server ran; a second stop is harmless
 
 
 async def _gen_docs(args: argparse.Namespace) -> int:

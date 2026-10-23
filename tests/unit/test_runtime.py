@@ -2,8 +2,11 @@
 
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
-from livepeer_builder import EngineSettings
+import pytest
+from livepeer_builder import EngineSettings, JourneyApi
+from livepeer_builder.testing import FakeEngine
 from pydantic import SecretStr
 
 from chatlpt.config import Settings
@@ -95,3 +98,84 @@ async def test_runtime_picks_the_streaming_adapter_when_the_engine_streams(tmp_p
         assert isinstance(app.backend, StreamingEngineChat)
     finally:
         await app.stop()
+
+
+async def test_a_failure_while_building_closes_what_was_opened(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from chatlpt.errors import InvalidRequest
+    from chatlpt.runtime import app as app_module
+    from chatlpt.store import SqlStore
+
+    closed: list[SqlStore] = []
+    close = SqlStore.close
+
+    async def recording_close(self: SqlStore) -> None:
+        closed.append(self)
+        await close(self)
+
+    built: list[JourneyApi] = []
+    build = app_module.build_engine
+
+    async def recording_build(*args: Any, **kwargs: Any) -> Any:
+        result = await build(*args, **kwargs)
+        if result is not None:
+            built.append(result[0])
+        return result
+
+    monkeypatch.setattr(SqlStore, "close", recording_close)
+    monkeypatch.setattr(app_module, "build_engine", recording_build)
+    settings = Settings(
+        database_url=f"sqlite+aiosqlite:///{tmp_path}/app.db",
+        session_secret=SecretStr("s"),
+        pricing_file=str(tmp_path / "missing.json"),  # fails after the store and the engine are open
+    )
+    with pytest.raises(InvalidRequest, match="pricing file"):
+        await Application.from_settings(
+            settings, engine_settings(tmp_path, signer_url="http://signer.test:8937")
+        )
+    assert len(closed) == 1
+    with pytest.raises(RuntimeError, match="engine is stopped"):
+        await built[0].start()
+
+
+async def test_stop_runs_every_step_when_one_fails(caplog: pytest.LogCaptureFixture) -> None:
+    class StuckEngine(FakeEngine):
+        async def stop(self) -> None:
+            raise RuntimeError("stuck")
+
+    class Recording(MemoryStore):
+        closed = False
+
+        async def close(self) -> None:
+            self.closed = True
+
+    store = Recording()
+    app = Application(
+        Settings(session_secret=SecretStr("s")),
+        store=store,
+        backend=None,
+        clock=FixedClock(),
+        hasher=PlainHasher(),
+        prices=StaticPrices(),
+        oauth={},
+        engine=StuckEngine(),
+    )
+    await app.stop()
+    assert store.closed
+    assert [r.event for r in caplog.records if r.levelname == "ERROR"] == ["app.stop_failed"]  # type: ignore[attr-defined]
+
+
+async def test_stopping_twice_is_harmless(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    settings = Settings(
+        database_url=f"sqlite+aiosqlite:///{tmp_path}/app.db",
+        session_secret=SecretStr("s"),
+        pricing_file=str(ROOT / "config" / "pricing" / "qwen3.8-27b.json"),
+    )
+    app = await Application.from_settings(
+        settings, engine_settings(tmp_path, signer_url="http://signer.test:8937")
+    )
+    await app.start()
+    await app.stop()  # the HTTP lifespan's stop
+    await app.stop()  # then the CLI's finally
+    assert not [r for r in caplog.records if r.levelname == "ERROR"]

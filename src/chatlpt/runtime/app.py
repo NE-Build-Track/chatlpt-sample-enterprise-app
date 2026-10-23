@@ -3,6 +3,7 @@
 import asyncio
 import contextlib
 import logging
+from collections.abc import Awaitable, Callable
 from datetime import timedelta
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -131,13 +132,29 @@ class Application:
 
     @classmethod
     async def from_settings(cls, settings: Settings, engine_settings: EngineSettings) -> "Application":
-        """The composition root: ChatLPT's settings and the embedded engine's, both as values."""
+        """The composition root: ChatLPT's settings and the embedded engine's, both as values.
+
+        What opens goes on an exit stack at once, so a failure part-way closes it (the engine is stopped,
+        the store closed). On success the application owns both and ``stop()`` releases them.
+        """
+        async with contextlib.AsyncExitStack() as opened:
+            app = await cls._build(settings, engine_settings, opened)
+            opened.pop_all()
+            return app
+
+    @classmethod
+    async def _build(
+        cls, settings: Settings, engine_settings: EngineSettings, opened: contextlib.AsyncExitStack
+    ) -> "Application":
         clock = SystemClock()
         store = await SqlStore.connect(settings.database_url, migrate=settings.auto_migrate)
+        opened.push_async_callback(store.close)
         apps = frozenset({settings.chat_app} | ({settings.image_app} if settings.tools_enabled else set()))
         built = await build_engine(
             engine_settings, apps=apps, approved_hosts=settings.approved_orchestrator_hosts, clock=clock
         )
+        if built is not None:
+            opened.push_async_callback(built[0].stop)
         backend: ChatBackend | None = None
         engine: JourneyApi | None = None
         metadata: ModelMetadataSource | None = None
@@ -196,10 +213,15 @@ class Application:
             with contextlib.suppress(asyncio.CancelledError):
                 await task
         self._tasks = []
-        await self.chat.drain()
+        steps: list[tuple[str, Callable[[], Awaitable[None]]]] = [("chat", self.chat.drain)]
         if self._engine is not None:
-            await self._engine.stop()
-        await self.store.close()
+            steps.append(("engine", self._engine.stop))
+        steps.append(("store", self.store.close))
+        for name, step in steps:  # every step runs: a stuck engine must not keep the database open
+            try:
+                await step()
+            except Exception:
+                _LOG.exception("shutdown step failed", extra={"event": "app.stop_failed", "step": name})
         _LOG.info("application stopped", extra={"event": "app.stopped"})
 
     def billing_prices(self) -> PriceTable:
