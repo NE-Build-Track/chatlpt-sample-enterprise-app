@@ -32,7 +32,7 @@ CONFINED: dict[str, tuple[str, ...]] = {
         "adapters/engine.py",
         "adapters/engine_images.py",
         "adapters/discovery.py",
-        "runtime/engine.py",
+        "runtime/",
     ),
     "livepeer_gateway": (),  # the engine owns the SDK; discovery decorates the engine's source
     "authlib": ("adapters/oauth.py",),

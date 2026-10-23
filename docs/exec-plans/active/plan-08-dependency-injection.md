@@ -32,7 +32,8 @@ changes beyond the refactor branch (its `FakeEngine` gaps found here were fixed 
 
 - [ ] `uv run pytest`, ruff, mypy, `scripts/check_docs.py` pass; coverage floors hold.
 - [ ] No module or test imports `livepeer_gateway` or a non-public `livepeer_builder` module.
-- [ ] No test sets or deletes an `LPB_*` environment variable.
+- [ ] Outside the CLI's own tests (the CLI reads the environment by design), no test sets or deletes an
+  `LPB_*` variable; only `config.py` reads the environment (a structural test).
 - [ ] A failure while building the application closes the store it opened (a failing-first test).
 - [ ] References (`builder-engine.md`, `payment-stack.md`, SECURITY, ARCHITECTURE, `.env.example`) and D2 updated.
 
@@ -43,7 +44,13 @@ changes beyond the refactor branch (its `FakeEngine` gaps found here were fixed 
 - 2026-10-23: built with `create`; the streaming adapter is picked by `jobs.streaming` (`348c54b`).
 - 2026-10-23: discovery decorates `parts.discovery_source` (`FilteredDiscovery`); ChatLPT no longer imports
   `livepeer_gateway` (now allowed nowhere) or `livepeer_builder.adapters.sdk`. The default's signer header
-  and discovery URL now reach discovery, which the replacement had dropped.
+  now reaches discovery; the replacement had dropped it (`0d7fb4d`).
+- 2026-10-23: settings are values. `build_engine(engine_settings, ...)` and
+  `Application.from_settings(settings, engine_settings)`; the CLI builds both from the environment.
+  `test_settings.py` (only `config.py` reads the environment) failed first on the `CHATLPT_ADMIN_EMAILS`
+  check in `from_settings`, which moved into `Settings.from_env` with a test; the unused
+  `Settings.engine_configured` (an `LPB_SIGNER_URL` read) is gone. `livepeer_builder` may be imported
+  anywhere in `runtime/`, the composition root.
 
 ## Decision log
 

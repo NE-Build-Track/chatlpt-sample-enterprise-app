@@ -3,7 +3,7 @@
 from decimal import Decimal
 from pathlib import Path
 
-import pytest
+from livepeer_builder import EngineSettings
 from pydantic import SecretStr
 
 from chatlpt.config import Settings
@@ -14,30 +14,34 @@ from chatlpt.testing import FixedClock, MemoryStore, PlainHasher, StaticPrices
 ROOT = Path(__file__).resolve().parents[2]
 
 
-async def test_build_engine_is_none_without_a_signer(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("LPB_SIGNER_URL", raising=False)
-    monkeypatch.delenv("LPB_DISCOVERY_URL", raising=False)
-    assert await build_engine(apps=frozenset({"a"}), approved_hosts=frozenset(), clock=FixedClock()) is None
+def engine_settings(tmp_path: Path, **values: object) -> EngineSettings:
+    """The embedded engine's settings as a value; no ``LPB_*`` variable is read or set."""
+    return EngineSettings.model_validate(
+        {"database_url": f"sqlite+aiosqlite:///{tmp_path}/engine.db", "log_json": False, **values}
+    )
 
 
-async def test_build_engine_with_a_signer_wires_the_filtered_discovery(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    monkeypatch.setenv("LPB_SIGNER_URL", "http://signer.test:8937")
-    monkeypatch.setenv("LPB_DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path}/engine.db")
-    monkeypatch.delenv("LPB_BATTERIES_URL", raising=False)
-    built = await build_engine(apps=frozenset({"a"}), approved_hosts=frozenset({"h"}), clock=FixedClock())
+async def test_build_engine_is_none_without_a_signer(tmp_path: Path) -> None:
+    built = await build_engine(
+        engine_settings(tmp_path), apps=frozenset({"a"}), approved_hosts=frozenset(), clock=FixedClock()
+    )
+    assert built is None
+
+
+async def test_build_engine_with_a_signer_wires_the_filtered_discovery(tmp_path: Path) -> None:
+    built = await build_engine(
+        engine_settings(tmp_path, signer_url="http://signer.test:8937"),
+        apps=frozenset({"a"}),
+        approved_hosts=frozenset({"h"}),
+        clock=FixedClock(),
+    )
     assert built is not None
     engine, source = built
     assert source.model_from_discovery("a") is None
     await engine.stop()
 
 
-async def test_from_settings_boots_without_an_engine_and_configures_providers(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    monkeypatch.delenv("LPB_SIGNER_URL", raising=False)
-    monkeypatch.delenv("LPB_DISCOVERY_URL", raising=False)
+async def test_from_settings_boots_without_an_engine_and_configures_providers(tmp_path: Path) -> None:
     settings = Settings(
         database_url=f"sqlite+aiosqlite:///{tmp_path}/app.db",
         session_secret=SecretStr("s"),
@@ -47,7 +51,7 @@ async def test_from_settings_boots_without_an_engine_and_configures_providers(
         github_client_id="h",
         github_client_secret=SecretStr("hs"),
     )
-    app = await Application.from_settings(settings)
+    app = await Application.from_settings(settings, engine_settings(tmp_path))
     try:
         assert set(app.oauth) == {"google", "github"} and app.backend is None
         await app.start()
@@ -76,20 +80,17 @@ async def test_health_reports_a_broken_database() -> None:
     assert not health.ready and health.checks[0].detail == "disk gone"
 
 
-async def test_runtime_picks_the_streaming_adapter_when_the_engine_streams(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+async def test_runtime_picks_the_streaming_adapter_when_the_engine_streams(tmp_path: Path) -> None:
     from chatlpt.adapters.engine import StreamingEngineChat
 
-    monkeypatch.setenv("LPB_SIGNER_URL", "http://signer.test:8937")
-    monkeypatch.setenv("LPB_DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path}/engine.db")
-    monkeypatch.delenv("LPB_BATTERIES_URL", raising=False)
     settings = Settings(
         database_url=f"sqlite+aiosqlite:///{tmp_path}/app.db",
         session_secret=SecretStr("s"),
         pricing_file=str(ROOT / "config" / "pricing" / "qwen3.8-27b.json"),
     )
-    app = await Application.from_settings(settings)
+    app = await Application.from_settings(
+        settings, engine_settings(tmp_path, signer_url="http://signer.test:8937")
+    )
     try:
         assert isinstance(app.backend, StreamingEngineChat)
     finally:

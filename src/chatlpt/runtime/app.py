@@ -3,10 +3,11 @@
 import asyncio
 import contextlib
 import logging
-import os
 from datetime import timedelta
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+
+from livepeer_builder import EngineSettings
 
 from chatlpt.adapters.clock import SystemClock
 from chatlpt.adapters.images import LocalImageFiles
@@ -129,18 +130,13 @@ class Application:
         self._stop = asyncio.Event()
 
     @classmethod
-    async def from_settings(cls, settings: Settings | None = None) -> "Application":
-        settings = settings or Settings.from_env()
-        if os.environ.get("CHATLPT_ADMIN_EMAILS"):
-            _LOG.warning(
-                "CHATLPT_ADMIN_EMAILS is no longer read; grant admin with `chatlpt make-admin EMAIL` (D26)",
-                extra={"event": "config.admin_emails_ignored"},
-            )
+    async def from_settings(cls, settings: Settings, engine_settings: EngineSettings) -> "Application":
+        """The composition root: ChatLPT's settings and the embedded engine's, both as values."""
         clock = SystemClock()
         store = await SqlStore.connect(settings.database_url, migrate=settings.auto_migrate)
         apps = frozenset({settings.chat_app} | ({settings.image_app} if settings.tools_enabled else set()))
         built = await build_engine(
-            apps=apps, approved_hosts=settings.approved_orchestrator_hosts, clock=clock
+            engine_settings, apps=apps, approved_hosts=settings.approved_orchestrator_hosts, clock=clock
         )
         backend: ChatBackend | None = None
         engine: object | None = None

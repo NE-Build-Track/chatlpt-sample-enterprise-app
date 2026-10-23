@@ -1,4 +1,4 @@
-"""Build the embedded BuilderEngine from ``LPB_*`` settings, its discovery filtered for ChatLPT (D8, D14)."""
+"""Build the embedded BuilderEngine from its settings, its discovery filtered for ChatLPT (D8, D14)."""
 
 import dataclasses
 import logging
@@ -11,11 +11,15 @@ from chatlpt.protocols import Clock
 _LOG = logging.getLogger(__name__)
 
 
+def engine_settings_from_env() -> EngineSettings:
+    """The embedded engine's settings from ``LPB_*`` variables, for the CLI's composition root."""
+    return EngineSettings.from_env()
+
+
 async def build_engine(
-    *, apps: frozenset[str], approved_hosts: frozenset[str], clock: Clock
+    settings: EngineSettings, *, apps: frozenset[str], approved_hosts: frozenset[str], clock: Clock
 ) -> tuple[BuilderEngine, FilteredDiscovery] | None:
-    """None when ``LPB_SIGNER_URL`` is unset: the app runs degraded (chat disabled) rather than failing."""
-    settings = EngineSettings.from_env()
+    """None without a signer or discovery URL: the app runs degraded (chat disabled) rather than failing."""
     if not settings.signer_url and not settings.discovery_url:
         return None
     filters: list[FilteredDiscovery] = []

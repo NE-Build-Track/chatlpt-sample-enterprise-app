@@ -1,8 +1,10 @@
 """Config layer: application settings from ``CHATLPT_*`` variables (docs/RELIABILITY.md#configuration).
 
-The embedded engine reads its own ``LPB_*`` variables; this module does not duplicate them.
+The embedded engine has its own ``LPB_*`` settings (``EngineSettings``); this module does not duplicate
+them. This is the only module that reads the environment (tests/structure/test_settings.py).
 """
 
+import logging
 import os
 from collections.abc import Mapping
 from decimal import Decimal
@@ -12,6 +14,7 @@ from pydantic import Field, SecretStr
 
 from chatlpt.contracts import Contract
 
+_LOG = logging.getLogger(__name__)
 ENV_PREFIX = "CHATLPT_"
 DEFAULT_DATABASE_URL = "sqlite+aiosqlite:///./chatlpt.db"
 DEFAULT_SYSTEM_PROMPT = (
@@ -85,10 +88,6 @@ class Settings(Contract):
         hosts = (urlparse(u.strip()).hostname for u in self.approved_orchestrators.split(",") if u.strip())
         return frozenset(h.lower() for h in hosts if h)
 
-    @property
-    def engine_configured(self) -> bool:
-        return bool(os.environ.get("LPB_SIGNER_URL"))
-
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "Settings":
         """Build settings from ``CHATLPT_<FIELD>`` variables; unset variables keep their defaults."""
@@ -98,4 +97,9 @@ class Settings(Contract):
             raw = source.get(ENV_PREFIX + name.upper())
             if raw is not None and raw != "":
                 values[name] = raw
+        if source.get(ENV_PREFIX + "ADMIN_EMAILS"):
+            _LOG.warning(
+                "CHATLPT_ADMIN_EMAILS is no longer read; grant admin with `chatlpt make-admin EMAIL` (D26)",
+                extra={"event": "config.admin_emails_ignored"},
+            )
         return cls.model_validate(values)
