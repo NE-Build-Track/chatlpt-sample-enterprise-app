@@ -523,7 +523,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "itsdangerous", specifier = ">=2.2" },
-    { name = "livepeer-builder", git = "https://github.com/NE-Build-Track/livepeer-builder-core.git?rev=b89c1bbc1150691d3aad520efb0a592768b953aa" },
+    { name = "livepeer-builder", git = "https://github.com/NE-Build-Track/livepeer-builder-core.git?rev=878e4f4f8e16508c32324828a11f30149786f057" },
     { name = "pydantic", extras = ["email"], specifier = ">=2.7" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.30" },
     { name = "uvicorn", specifier = ">=0.30" },
@@ -1169,8 +1169,8 @@ wheels = [
 
 [[package]]
 name = "livepeer-builder"
-version = "0.1.1.dev48+gb89c1bb"
-source = { git = "https://github.com/NE-Build-Track/livepeer-builder-core.git?rev=b89c1bbc1150691d3aad520efb0a592768b953aa#b89c1bbc1150691d3aad520efb0a592768b953aa" }
+version = "0.1.1.dev54+g878e4f4"
+source = { git = "https://github.com/NE-Build-Track/livepeer-builder-core.git?rev=878e4f4f8e16508c32324828a11f30149786f057#878e4f4f8e16508c32324828a11f30149786f057" }
 dependencies = [
     { name = "aiohttp" },
     { name = "aiosqlite" },

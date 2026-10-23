@@ -18,7 +18,7 @@ acceptance checks pass, in the same commit. Known shortcuts go to
 | plan-05-engine-streaming (builder-core) | `tasks/m3/mz/stream-support`: contract, transport, REST, tests | implemented and shown live 2026-10-19 (`973ac57`); review fixes D34–D39 shown live 2026-10-20 (`a89216d`); PR #28 review fixes and D40 2026-10-21 (`93756ba`); merged to `releases/m3` 2026-10-21 with PR #31 (`ad6bba9`, pinned here) |
 | [plan-06-streaming-adapter](exec-plans/completed/plan-06-streaming-adapter.md) | Move the pin, swap `adapters/engine.py`, verify deltas end to end | completed 2026-10-19 |
 | [plan-07-model-driven-images](exec-plans/completed/plan-07-model-driven-images.md) | The assistant draws through a tool call; images stored, priced and captioned | completed 2026-10-19 |
-| [plan-08-dependency-injection](exec-plans/completed/plan-08-dependency-injection.md) | Move onto builder-core's DI refactor: `create` with decorate, settings as values, `ActorApi`, `FakeEngine` | completed 2026-10-23; shown live on the deployed stack (23 replies and checks); pinned to `releases/m3` `b89c1bb` (PR #41 merged) |
+| [plan-08-dependency-injection](exec-plans/completed/plan-08-dependency-injection.md) | Move onto builder-core's DI refactor: `create` with decorate, settings as values, `ActorApi`, `FakeEngine` | completed 2026-10-23; shown live on the deployed stack (23 replies and checks); pinned to `releases/m3` `878e4f4` (PRs #41 and #42 merged) |
 
 Small changes do not need a plan; they need a test and a sentence in the commit.
 

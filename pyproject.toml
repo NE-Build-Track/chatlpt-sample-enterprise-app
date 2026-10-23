@@ -22,9 +22,9 @@ dependencies = [
     "argon2-cffi>=23.1",
     "authlib>=1.3",
     "httpx>=0.27",
-    # D2: releases/m3 at b89c1bb, the merge of PR #41 (the dependency-injection refactor)
+    # D2: releases/m3 at 878e4f4, the merge of PR #42 (after PR #41, the dependency-injection refactor)
     # (docs/design-docs/decisions.md). Re-pin to a release tag once one is cut.
-    "livepeer-builder @ git+https://github.com/NE-Build-Track/livepeer-builder-core.git@b89c1bbc1150691d3aad520efb0a592768b953aa",
+    "livepeer-builder @ git+https://github.com/NE-Build-Track/livepeer-builder-core.git@878e4f4f8e16508c32324828a11f30149786f057",
 ]
 
 [project.scripts]
