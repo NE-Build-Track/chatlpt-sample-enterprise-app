@@ -1,7 +1,8 @@
 # livepeer-builder (embedded)
 
 Pinned to branch **`tasks/mz/dependency-injection-refactor`** of `NE-Build-Track/livepeer-builder-core`
-at commit `165e601` (2026-10-23: the dependency-injection refactor on `releases/m3` `6c5c689`; plan 08).
+at commit `d6a7d9c` (2026-10-23: the dependency-injection refactor on `releases/m3` `6c5c689`, plan 08;
+`JourneyApi` renamed `ActorApi` in builder-core decision 14).
 Before that `releases/m3` at `ad6bba9` (2026-10-21: the merge of PR #28, streaming, and PR #31,
 gateway `3238731` and D41), and before that the
 streaming branch `tasks/m3/mz/stream-support` at `93756ba` (2026-10-21: the PR #28 review fixes, D40), `a89216d` (2026-10-20: the stream
@@ -13,7 +14,7 @@ lifecycle fixes, D34–D39), `973ac57`
 
 | Need | Engine API | Notes |
 | --- | --- | --- |
-| Build and start | `BuilderEngine.create(engine_settings, decorate=...)`, `await engine.start()` | `engine_settings` is an `EngineSettings` value; the CLI reads it from `LPB_*` ([payment-stack](payment-stack.md)). We type the engine as `JourneyApi` |
+| Build and start | `BuilderEngine.create(engine_settings, decorate=...)`, `await engine.start()` | `engine_settings` is an `EngineSettings` value; the CLI reads it from `LPB_*` ([payment-stack](payment-stack.md)). We type the engine as `ActorApi` |
 | Who is calling | `ActorContext(actor_id, application_id="chatlpt", permissions={discover, jobs.run, jobs.read, costs.read})` | Built by our runtime; no engine key for users |
 | Offerings | `engine.discovery` snapshot / offerings | Filtered to the chat app on approved orchestrators |
 | A reply | `engine.jobs.streaming.stream(actor, JobRequest(app="blueclaw/chat/qwen3.8-27b", path="/v1/chat/completions", payload={..., "stream": true, "stream_options": {"include_usage": true}}, operation_ref=..., max_attempts=..., timeout_s=..., idle_timeout_s=...))` | A `JobStream` of SSE bytes. `jobs.streaming` is `None` when the transport cannot stream; then `jobs.run` |

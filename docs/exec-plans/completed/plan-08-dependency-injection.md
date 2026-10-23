@@ -68,6 +68,8 @@ changes beyond the refactor branch (its `FakeEngine` gaps found here were fixed 
   the decorator, `jobs.streaming`, `JourneyApi` and `FakeEngine`; D2 records the pin. The pin to an
   unmerged branch is T9. Acceptance met; plan complete. Not done here: a reply through the deployed
   stack on this build.
+- 2026-10-23 (after completion): builder-core renamed `JourneyApi` to `ActorApi` (its decision 14); the pin
+  moved to `d6a7d9c` and the adapters, runtime and references follow. No behaviour changed.
 
 ## Decision log
 

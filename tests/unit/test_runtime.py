@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from livepeer_builder import EngineSettings, JourneyApi
+from livepeer_builder import ActorApi, EngineSettings
 from livepeer_builder.testing import FakeEngine
 from pydantic import SecretStr
 
@@ -114,7 +114,7 @@ async def test_a_failure_while_building_closes_what_was_opened(
         closed.append(self)
         await close(self)
 
-    built: list[JourneyApi] = []
+    built: list[ActorApi] = []
     build = app_module.build_engine
 
     async def recording_build(*args: Any, **kwargs: Any) -> Any:

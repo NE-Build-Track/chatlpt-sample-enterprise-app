@@ -8,7 +8,7 @@ from datetime import timedelta
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
-from livepeer_builder import EngineSettings, JourneyApi
+from livepeer_builder import ActorApi, EngineSettings
 
 from chatlpt.adapters.clock import SystemClock
 from chatlpt.adapters.images import LocalImageFiles
@@ -63,7 +63,7 @@ class Application:
         hasher: PasswordHasher,
         prices: PriceSource,
         oauth: dict[str, OAuthProvider],
-        engine: JourneyApi | None = None,
+        engine: ActorApi | None = None,
         metadata: ModelMetadataSource | None = None,
         image_backend: ImageBackend | None = None,
         image_files: ImageFiles | None = None,
@@ -156,7 +156,7 @@ class Application:
         if built is not None:
             opened.push_async_callback(built[0].stop)
         backend: ChatBackend | None = None
-        engine: JourneyApi | None = None
+        engine: ActorApi | None = None
         metadata: ModelMetadataSource | None = None
         image_backend: ImageBackend | None = None
         if built is not None:

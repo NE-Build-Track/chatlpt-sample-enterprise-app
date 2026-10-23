@@ -15,6 +15,7 @@ from typing import Any
 from uuid import UUID
 
 from livepeer_builder import (
+    ActorApi,
     ActorContext,
     CostSummary,
     EngineError,
@@ -23,7 +24,6 @@ from livepeer_builder import (
     JobRequest,
     JobResult,
     JobStreamApi,
-    JourneyApi,
     NoCapacity,
     NotProvisioned,
     OperationConflict,
@@ -89,7 +89,7 @@ class BufferedReply:
 class BufferedEngineChat:
     def __init__(
         self,
-        engine: JourneyApi,
+        engine: ActorApi,
         clock: Clock,
         *,
         app: str,
@@ -298,7 +298,7 @@ class StreamingEngineChat(BufferedEngineChat):
 
     def __init__(
         self,
-        engine: JourneyApi,
+        engine: ActorApi,
         clock: Clock,
         *,
         app: str,

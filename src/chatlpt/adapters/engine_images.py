@@ -4,10 +4,10 @@ from typing import Any
 from uuid import UUID
 
 from livepeer_builder import (
+    ActorApi,
     EngineError,
     JobFailed,
     JobRequest,
-    JourneyApi,
     NoCapacity,
     NotProvisioned,
     OperationConflict,
@@ -43,7 +43,7 @@ class EngineImageResult:
 class EngineImages:
     """The ImageBackend: one buffered ``jobs.run`` per picture on the fal FLUX app (D25)."""
 
-    def __init__(self, engine: JourneyApi, *, app: str, max_attempts: int = 2) -> None:
+    def __init__(self, engine: ActorApi, *, app: str, max_attempts: int = 2) -> None:
         self._engine = engine
         self.app = app
         self._max_attempts = max_attempts
