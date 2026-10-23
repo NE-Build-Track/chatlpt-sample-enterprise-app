@@ -7,7 +7,7 @@ from datetime import timedelta
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
-from livepeer_builder import EngineSettings
+from livepeer_builder import EngineSettings, JourneyApi
 
 from chatlpt.adapters.clock import SystemClock
 from chatlpt.adapters.images import LocalImageFiles
@@ -62,7 +62,7 @@ class Application:
         hasher: PasswordHasher,
         prices: PriceSource,
         oauth: dict[str, OAuthProvider],
-        engine: object | None = None,
+        engine: JourneyApi | None = None,
         metadata: ModelMetadataSource | None = None,
         image_backend: ImageBackend | None = None,
         image_files: ImageFiles | None = None,
@@ -139,7 +139,7 @@ class Application:
             engine_settings, apps=apps, approved_hosts=settings.approved_orchestrator_hosts, clock=clock
         )
         backend: ChatBackend | None = None
-        engine: object | None = None
+        engine: JourneyApi | None = None
         metadata: ModelMetadataSource | None = None
         image_backend: ImageBackend | None = None
         if built is not None:
@@ -179,7 +179,7 @@ class Application:
 
     async def start(self) -> None:
         if self._engine is not None:
-            await self._engine.start()  # type: ignore[attr-defined]
+            await self._engine.start()
         self._stop.clear()
         self._tasks = [
             asyncio.create_task(self._retention_loop(), name="image-retention"),
@@ -198,7 +198,7 @@ class Application:
         self._tasks = []
         await self.chat.drain()
         if self._engine is not None:
-            await self._engine.stop()  # type: ignore[attr-defined]
+            await self._engine.stop()
         await self.store.close()
         _LOG.info("application stopped", extra={"event": "app.stopped"})
 

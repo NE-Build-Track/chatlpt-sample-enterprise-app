@@ -1,20 +1,17 @@
 """The image adapters: files on disk, the price table, and the engine-backed image job."""
 
 from pathlib import Path
-from typing import Any
 from uuid import UUID, uuid4
 
 import httpx
 import pytest
-from livepeer_builder import JobRequest, JobResult
-from livepeer_builder.contracts import Failure, Runner
-from livepeer_builder.errors import JobFailed
+from livepeer_builder import JobRequest, Runner
+from livepeer_builder.testing import Fails, FakeEngine, Reply, runner
 
 from chatlpt.adapters.engine_images import EngineImages
 from chatlpt.adapters.images import LocalImageFiles
 from chatlpt.adapters.pricing_images import FileImagePriceSource
 from chatlpt.errors import ChatUnavailable, InvalidRequest, ReplyFailed
-from tests.unit.test_engine_backend import FakeEngine, job
 
 ROOT = Path(__file__).resolve().parents[2]
 IMAGE_APP = "comfystream/fal-flux-schnell"
@@ -53,47 +50,34 @@ def test_image_price_table_loads_and_missing_file_fails() -> None:
         FileImagePriceSource(ROOT / "config" / "pricing" / "nope.json")
 
 
-def _image_result(data: dict[str, Any]) -> JobResult:
-    return JobResult(job=job(), status_code=200, content=b"{}", content_type="application/json", data=data)
+IMAGE_RUNNER = runner(IMAGE_APP, url="https://ai1/app", orchestrator_url="https://ai1:8936")
 
 
-@pytest.fixture
-def engine() -> FakeEngine:
-    fake = FakeEngine()
-    fake.discovery.runners.append(
-        Runner(
-            url="https://ai1/app",
-            app=IMAGE_APP,
-            runner_id=None,
-            mode="single-shot",
-            orchestrator_url="https://ai1:8936",
-            capacity=4,
-            capacity_available=4,
-            rate=None,
+def image_engine(reply: Reply | Fails, *, runners: tuple[Runner, ...] = (IMAGE_RUNNER,)) -> FakeEngine:
+    return FakeEngine(replies={(IMAGE_APP, "/"): reply}, runners=runners)
+
+
+async def test_engine_images_runs_the_job_and_parses_the_result() -> None:
+    engine = image_engine(
+        Reply(
+            data={
+                "output": {
+                    "images": [
+                        {
+                            "url": "https://v3.fal.media/x.jpg",
+                            "width": 768,
+                            "height": 1024,
+                            "content_type": "image/jpeg",
+                        }
+                    ],
+                    "seed": 7,
+                    "has_nsfw_concepts": [False],
+                }
+            }
         )
     )
-    return fake
-
-
-async def test_engine_images_runs_the_job_and_parses_the_result(engine: FakeEngine) -> None:
-    images = EngineImages(engine, app=IMAGE_APP)  # type: ignore[arg-type]
+    images = EngineImages(engine, app=IMAGE_APP)
     assert images.ready() == (True, None)
-    engine.jobs.outcome = _image_result(
-        {
-            "output": {
-                "images": [
-                    {
-                        "url": "https://v3.fal.media/x.jpg",
-                        "width": 768,
-                        "height": 1024,
-                        "content_type": "image/jpeg",
-                    }
-                ],
-                "seed": 7,
-                "has_nsfw_concepts": [False],
-            }
-        }
-    )
     result = await images.generate(UUID(int=1), "a fox", "portrait_4_3", operation_ref="img-1")
     assert (result.url, result.width, result.height, result.seed, result.flagged) == (
         "https://v3.fal.media/x.jpg",
@@ -106,16 +90,14 @@ async def test_engine_images_runs_the_job_and_parses_the_result(engine: FakeEngi
     assert request.app == IMAGE_APP and request.path == "/" and request.payload is not None
     assert request.payload["prompt"] == "a fox" and request.payload["image_size"] == "portrait_4_3"
     assert request.payload["enable_safety_checker"] is True and request.operation_ref == "img-1"
-    assert result.orchestrator_url == "https://o:1"  # from the job's attempt
+    assert result.orchestrator_url == "https://ai1:8936"  # from the job's attempt
 
 
-async def test_engine_images_errors(engine: FakeEngine) -> None:
-    images = EngineImages(engine, app=IMAGE_APP)  # type: ignore[arg-type]
-    engine.jobs.outcome = _image_result({"output": {"images": []}})
+async def test_engine_images_errors() -> None:
+    empty = EngineImages(image_engine(Reply(data={"output": {"images": []}})), app=IMAGE_APP)
     with pytest.raises(ReplyFailed, match="no image"):
-        await images.generate(UUID(int=1), "p", "square", operation_ref="a")
-    engine.jobs.outcome = JobFailed(job(state="failed", failure=Failure(kind="no_offering", message="none")))
+        await empty.generate(UUID(int=1), "p", "square", operation_ref="a")
+    refused = EngineImages(image_engine(Fails(kind="no_offering", message="none")), app=IMAGE_APP)
     with pytest.raises(ChatUnavailable):
-        await images.generate(UUID(int=1), "p", "square", operation_ref="b")
-    engine.discovery.runners = [r for r in engine.discovery.runners if r.app != IMAGE_APP]
-    assert images.ready()[0] is False
+        await refused.generate(UUID(int=1), "p", "square", operation_ref="b")
+    assert EngineImages(image_engine(Reply(), runners=()), app=IMAGE_APP).ready()[0] is False

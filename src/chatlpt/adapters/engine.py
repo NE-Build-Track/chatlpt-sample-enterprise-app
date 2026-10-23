@@ -16,19 +16,21 @@ from uuid import UUID
 
 from livepeer_builder import (
     ActorContext,
-    BuilderEngine,
     CostSummary,
+    EngineError,
     JobCost,
     JobFailed,
     JobRequest,
+    JobResult,
+    JobStreamApi,
+    JourneyApi,
     NoCapacity,
     NotProvisioned,
     OperationConflict,
     OperationExists,
     ProviderUnavailable,
 )
-from livepeer_builder.errors import EngineError
-from livepeer_builder.errors import NotFound as EngineNotFound
+from livepeer_builder import NotFound as EngineNotFound
 
 from chatlpt.adapters.openai_wire import ToolCallAssembler, parse_tool_calls, wire_turn
 from chatlpt.adapters.sse import SseDecoder
@@ -87,7 +89,7 @@ class BufferedReply:
 class BufferedEngineChat:
     def __init__(
         self,
-        engine: BuilderEngine,
+        engine: JourneyApi,
         clock: Clock,
         *,
         app: str,
@@ -218,7 +220,7 @@ class BufferedEngineChat:
         except EngineError as exc:
             raise ChatUnavailable(str(exc)) from exc
 
-    async def _run(self, user_id: UUID, request: JobRequest) -> Any:
+    async def _run(self, user_id: UUID, request: JobRequest) -> JobResult:
         try:
             return await self._engine.jobs.run(actor_for(user_id), request)
         except JobFailed as exc:
@@ -234,14 +236,13 @@ class BufferedEngineChat:
 class StreamingReply:
     """The ReplyStream over the engine's ``JobStream``: SSE frames become reply chunks as they arrive."""
 
-    def __init__(self, job_stream: Any, orchestrator_url: str | None) -> None:
+    def __init__(self, job_stream: JobStreamApi, orchestrator_url: str | None) -> None:
         self._stream = job_stream
         self._orchestrator_url = orchestrator_url
 
     @property
     def job_id(self) -> UUID | None:
-        job_id = self._stream.job.id
-        return job_id if isinstance(job_id, UUID) else None
+        return self._stream.job.id
 
     @property
     def orchestrator_url(self) -> str | None:
@@ -251,7 +252,7 @@ class StreamingReply:
         return self._iterate()
 
     async def _iterate(self) -> AsyncIterator[ReplyChunk]:
-        if not str(self._stream.content_type).startswith("text/event-stream"):
+        if not self._stream.content_type.startswith("text/event-stream"):
             # The runner answered with one body (no stream support, or an error document): parse it whole.
             body = b"".join([chunk async for chunk in self._stream])
             try:
@@ -297,7 +298,7 @@ class StreamingEngineChat(BufferedEngineChat):
 
     def __init__(
         self,
-        engine: BuilderEngine,
+        engine: JourneyApi,
         clock: Clock,
         *,
         app: str,

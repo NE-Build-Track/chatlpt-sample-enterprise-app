@@ -51,6 +51,13 @@ changes beyond the refactor branch (its `FakeEngine` gaps found here were fixed 
   check in `from_settings`, which moved into `Settings.from_env` with a test; the unused
   `Settings.engine_configured` (an `LPB_SIGNER_URL` read) is gone. `livepeer_builder` may be imported
   anywhere in `runtime/`, the composition root.
+- 2026-10-23: adapters are typed against `JourneyApi` and the runtime holds `JourneyApi | None` (no more
+  `type: ignore` on `start`/`stop`). Their tests use builder-core's `FakeEngine` instead of three
+  hand-written duck-typed fakes. The fake lacked what these tests needed (parsed `data`, attempts,
+  failure part-way through a stream, repeated `operation_ref`, scripted engine errors, paid failures); those were
+  added in builder-core with contract cases (`bdf2630`, `165e601`) and the pin moved to `165e601`.
+  `tests/structure/test_engine_api.py` keeps every `livepeer_builder` import public; it failed first on
+  six files importing `livepeer_builder.errors` and `.contracts`.
 
 ## Decision log
 

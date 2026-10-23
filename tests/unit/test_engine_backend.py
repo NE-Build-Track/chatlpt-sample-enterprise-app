@@ -1,4 +1,4 @@
-"""BufferedEngineChat against a duck-typed engine: readiness, the paid call, model info, costs, errors."""
+"""BufferedEngineChat over builder-core's FakeEngine: readiness, the paid call, model info, costs, errors."""
 
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -6,13 +6,10 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
-from livepeer_builder import ActorContext, EngineHealth, JobRequest, JobResult, NoCapacity, OperationExists
-from livepeer_builder.contracts import Attempt, Failure, Job, Runner
-from livepeer_builder.contracts.costs import Fees, JobCost
-from livepeer_builder.errors import EngineError, JobFailed
-from livepeer_builder.errors import NotFound as EngineNotFound
+from livepeer_builder import EngineError, EngineHealth, Fees, JobCost, NoCapacity, Runner
+from livepeer_builder.testing import Fails, FakeEngine, Raises, Reply, runner
 
-from chatlpt.adapters.engine import APPLICATION_ID, BufferedEngineChat, actor_for
+from chatlpt.adapters.engine import APPLICATION_ID, CHAT_PATH, MODELS_PATH, BufferedEngineChat, actor_for
 from chatlpt.contracts import ChatParams, ChatTurn, TokenUsage
 from chatlpt.errors import ChatUnavailable, Conflict, NotFound, ReplyFailed
 from chatlpt.testing import FixedClock
@@ -20,139 +17,55 @@ from chatlpt.testing import FixedClock
 APP = "blueclaw/chat/qwen3.8-27b"
 NOW = datetime(2026, 10, 19, tzinfo=UTC)
 PARAMS = ChatParams(system_prompt="sys", temperature=Decimal("0.7"), max_output_tokens=256)
+HI = [ChatTurn(role="user", content="hi")]
+COMPLETION = {
+    "choices": [{"message": {"content": "hey"}, "finish_reason": "stop"}],
+    "usage": {"prompt_tokens": 3, "completion_tokens": 1},
+}
+CHAT_RUNNER = runner(APP, url="https://r", orchestrator_url="https://o:1")
+ANSWERED = Reply(data=COMPLETION)
 
 
-def job(
-    *, state: str = "succeeded", failure: Failure | None = None, orchestrator: str | None = "https://o:1"
-) -> Job:
-    attempt = Attempt(
-        job_id=uuid4(),
-        number=1,
-        runner_url="https://r",
-        orchestrator_url=orchestrator,
-        allocation_id="alloc",
-        sessions=(),
-        payment_sent=True,
-        outcome="succeeded",
-        status_code=200,
-        started_at=NOW,
-        ended_at=NOW,
-    )
-    return Job(
-        id=uuid4(),
-        actor_id="u",
-        application_id=APPLICATION_ID,
-        operation_ref=None,
-        mode="immediate",
-        app=APP,
-        capability=None,
-        model=None,
-        state=state,
-        attempts=(attempt,),
-        failure=failure,  # type: ignore[arg-type]
-        result=None,
-        usage=None,
-        created_at=NOW,
-        completed_at=NOW,
+def health(*, ready: bool = True, fresh: bool = True) -> EngineHealth:
+    return EngineHealth(
+        ready=ready,
+        discovery_fresh=fresh,
+        discovery_observed_at=NOW,
+        discovery_error=None,
+        cost_sync_at=None,
+        cost_sync_error=None,
+        running_jobs=0,
+        allocation_mode="per_application",
+        version="t",
     )
 
 
-def result(data: dict[str, Any]) -> JobResult:
-    return JobResult(job=job(), status_code=200, content=b"{}", content_type="application/json", data=data)
+def engine_with(
+    chat: Reply | Fails | Raises = ANSWERED,
+    *,
+    models: dict[str, Any] | None = None,
+    runners: tuple[Runner, ...] = (CHAT_RUNNER,),
+    costs: dict[UUID, JobCost | Raises] | None = None,
+    ready: bool = True,
+    fresh: bool = True,
+) -> FakeEngine:
+    replies: dict[tuple[str, str], Reply | Fails | Raises] = {(APP, CHAT_PATH): chat}
+    if models is not None:
+        replies[(APP, MODELS_PATH)] = Reply(data=models)
+    return FakeEngine(replies=replies, runners=runners, costs=costs, health=health(ready=ready, fresh=fresh))
 
 
-class FakeJobs:
-    def __init__(self) -> None:
-        self.requests: list[tuple[ActorContext, JobRequest]] = []
-        self.outcome: Any = result(
-            {
-                "choices": [{"message": {"content": "hey"}, "finish_reason": "stop"}],
-                "usage": {"prompt_tokens": 3, "completion_tokens": 1},
-            }
-        )
-        self.reported: list[dict[str, int]] = []
-
-    async def run(self, actor: ActorContext, request: JobRequest) -> JobResult:
-        self.requests.append((actor, request))
-        if isinstance(self.outcome, BaseException):
-            raise self.outcome
-        return self.outcome  # type: ignore[no-any-return]
-
-    async def report_usage(self, actor: ActorContext, job_id: UUID, quantities: dict[str, int]) -> None:
-        self.reported.append(quantities)
-        if quantities.get("prompt_tokens") == -1:
-            raise EngineError("boom")
-
-
-class FakeCosts:
-    def __init__(self) -> None:
-        self.cost: Any = JobCost(
-            job_id=uuid4(),
-            status="pending",
-            fees=Fees(),
-            attempts=(),
-            first_observed_at=None,
-            updated_at=None,
-        )
-
-    async def for_job(self, actor: ActorContext, job_id: UUID) -> JobCost:
-        if isinstance(self.cost, BaseException):
-            raise self.cost
-        return self.cost  # type: ignore[no-any-return]
-
-
-class FakeDiscovery:
-    def __init__(self) -> None:
-        self.runners: list[Runner] = [
-            Runner(
-                url="https://r",
-                app=APP,
-                runner_id=None,
-                mode="single-shot",
-                orchestrator_url="https://o:1",
-                capacity=1,
-                capacity_available=1,
-                rate=None,
-            )
-        ]
-
-    def candidates(self, app: str) -> list[Runner]:
-        return [r for r in self.runners if r.app == app]
-
-
-class FakeEngine:
-    def __init__(self) -> None:
-        self.jobs = FakeJobs()
-        self.costs = FakeCosts()
-        self.discovery = FakeDiscovery()
-        self.ready = True
-        self.fresh = True
-
-    def health(self) -> EngineHealth:
-        return EngineHealth(
-            ready=self.ready,
-            discovery_fresh=self.fresh,
-            discovery_observed_at=NOW,
-            discovery_error=None,
-            cost_sync_at=None,
-            cost_sync_error=None,
-            running_jobs=0,
-            allocation_mode="per_application",
-            version="t",
-        )
-
-
-@pytest.fixture
-def engine() -> FakeEngine:
-    return FakeEngine()
-
-
-@pytest.fixture
 def backend(engine: FakeEngine) -> BufferedEngineChat:
-    return BufferedEngineChat(engine, FixedClock(), app=APP)  # type: ignore[arg-type]
+    return BufferedEngineChat(engine, FixedClock(), app=APP)
 
 
-def test_actor_context_is_scoped_to_the_app(backend: BufferedEngineChat) -> None:
+def pending(job_id: UUID) -> JobCost:
+    return JobCost(
+        job_id=job_id, status="pending", fees=Fees(), attempts=(), first_observed_at=None, updated_at=None
+    )
+
+
+def test_actor_context_is_scoped_to_the_app() -> None:
     actor = actor_for(UUID(int=7))
     assert (
         actor.application_id == APPLICATION_ID
@@ -161,93 +74,87 @@ def test_actor_context_is_scoped_to_the_app(backend: BufferedEngineChat) -> None
     )
 
 
-def test_ready_reports_each_reason(backend: BufferedEngineChat, engine: FakeEngine) -> None:
-    assert backend.ready() == (True, None)
-    engine.discovery.runners = []
-    assert backend.ready()[0] is False and "no runner" in (backend.ready()[1] or "")
-    engine.fresh = False
-    assert backend.ready() == (False, "runner discovery is stale")
-    engine.ready = False
-    assert backend.ready() == (False, "the engine is not ready")
+def test_ready_reports_each_reason() -> None:
+    assert backend(engine_with()).ready() == (True, None)
+    no_runner = backend(engine_with(runners=())).ready()
+    assert no_runner[0] is False and "no runner" in (no_runner[1] or "")
+    assert backend(engine_with(fresh=False)).ready() == (False, "runner discovery is stale")
+    assert backend(engine_with(ready=False)).ready() == (False, "the engine is not ready")
 
 
-async def test_open_reply_builds_the_job_and_yields_the_parsed_body(
-    backend: BufferedEngineChat, engine: FakeEngine
-) -> None:
-    stream = await backend.open_reply(
-        UUID(int=1), [ChatTurn(role="user", content="hi")], PARAMS, operation_ref="op-1"
-    )
+async def test_open_reply_builds_the_job_and_yields_the_parsed_body() -> None:
+    engine = engine_with()
+    stream = await backend(engine).open_reply(UUID(int=1), HI, PARAMS, operation_ref="op-1")
     actor, request = engine.jobs.requests[0]
-    assert (
-        actor.actor_id == str(UUID(int=1)) and request.app == APP and request.path == "/v1/chat/completions"
-    )
+    assert actor.actor_id == str(UUID(int=1)) and request.app == APP and request.path == CHAT_PATH
     assert request.operation_ref == "op-1" and request.payload is not None
     assert (
         request.payload["messages"] == [{"role": "user", "content": "hi"}]
         and request.payload["stream"] is False
     )
-    assert (
-        request.payload["chat_template_kwargs"] == {"enable_thinking": True}
-        and request.payload["max_tokens"] == 256
-    )
+    assert request.payload["chat_template_kwargs"] == {"enable_thinking": True}
+    assert request.payload["max_tokens"] == 256
     kinds = [c.kind async for c in stream]
     assert kinds == ["content", "usage", "done"]
-    assert stream.job_id is not None and stream.orchestrator_url == "https://o:1"
+    assert stream.job_id is not None and stream.orchestrator_url == "https://o:1"  # from the job's attempt
 
 
-async def test_model_info_reads_max_model_len(backend: BufferedEngineChat, engine: FakeEngine) -> None:
-    engine.jobs.outcome = result({"object": "list", "data": [{"id": "Qwen3.8-27B", "max_model_len": 40960}]})
-    info = await backend.model_info(UUID(int=1))
+async def test_model_info_reads_max_model_len() -> None:
+    engine = engine_with(models={"object": "list", "data": [{"id": "Qwen3.8-27B", "max_model_len": 40960}]})
+    info = await backend(engine).model_info(UUID(int=1))
     assert info.model_id == "Qwen3.8-27B" and info.max_model_len == 40960 and info.app == APP
-    assert engine.jobs.requests[0][1].method == "GET" and engine.jobs.requests[0][1].path == "/v1/models"
-    engine.jobs.outcome = result({"data": [{"id": "x"}]})
+    request = engine.jobs.requests[0][1]
+    assert request.method == "GET" and request.path == MODELS_PATH
     with pytest.raises(ReplyFailed):
-        await backend.model_info(UUID(int=1))
+        await backend(engine_with(models={"data": [{"id": "x"}]})).model_info(UUID(int=1))
 
 
-async def test_wholesale_and_report_usage_map_engine_errors(
-    backend: BufferedEngineChat, engine: FakeEngine
-) -> None:
-    assert (await backend.wholesale(UUID(int=1), uuid4())).status == "pending"
-    engine.costs.cost = EngineNotFound("nope")
+async def test_wholesale_maps_engine_errors() -> None:
+    priced, missing, down = uuid4(), uuid4(), uuid4()
+    chat = backend(engine_with(costs={priced: pending(priced), down: Raises(EngineError("down"))}))
+    assert (await chat.wholesale(UUID(int=1), priced)).status == "pending"
     with pytest.raises(NotFound):
-        await backend.wholesale(UUID(int=1), uuid4())
-    engine.costs.cost = EngineError("down")
+        await chat.wholesale(UUID(int=1), missing)
     with pytest.raises(ChatUnavailable):
-        await backend.wholesale(UUID(int=1), uuid4())
-    await backend.report_usage(
-        UUID(int=1), uuid4(), TokenUsage(prompt_tokens=1, completion_tokens=2, reasoning_tokens=1)
+        await chat.wholesale(UUID(int=1), down)
+
+
+async def test_report_usage_reaches_the_engine_and_maps_its_errors() -> None:
+    engine = engine_with()
+    chat = backend(engine)
+    reply = await chat.open_reply(UUID(int=1), HI, PARAMS, operation_ref="op")
+    assert reply.job_id is not None
+    await chat.report_usage(
+        UUID(int=1), reply.job_id, TokenUsage(prompt_tokens=1, completion_tokens=2, reasoning_tokens=1)
     )
-    assert engine.jobs.reported == [{"prompt_tokens": 1, "completion_tokens": 2, "reasoning_tokens": 1}]
-    with pytest.raises(ChatUnavailable):
-        await backend.report_usage(
-            UUID(int=1),
-            uuid4(),
-            TokenUsage(prompt_tokens=-1 + 1, completion_tokens=0).model_copy(update={"prompt_tokens": -1}),
-        )
+    assert engine.jobs.usage_reports == [
+        (reply.job_id, {"prompt_tokens": 1, "completion_tokens": 2, "reasoning_tokens": 1})
+    ]
+    negative = TokenUsage(prompt_tokens=0, completion_tokens=0).model_copy(update={"prompt_tokens": -1})
+    with pytest.raises(ChatUnavailable):  # the engine refuses negative quantities
+        await chat.report_usage(UUID(int=1), reply.job_id, negative)
+    with pytest.raises(ChatUnavailable):  # and a job it does not know
+        await chat.report_usage(UUID(int=1), uuid4(), TokenUsage(prompt_tokens=1, completion_tokens=1))
 
 
-async def test_run_maps_every_engine_exception(backend: BufferedEngineChat, engine: FakeEngine) -> None:
-    turns = [ChatTurn(role="user", content="hi")]
-    engine.jobs.outcome = NoCapacity("busy")
+async def test_run_maps_every_engine_exception() -> None:
     with pytest.raises(ChatUnavailable):
-        await backend.open_reply(UUID(int=1), turns, PARAMS, operation_ref="a")
-    engine.jobs.outcome = OperationExists(job())
-    with pytest.raises(Conflict):
-        await backend.open_reply(UUID(int=1), turns, PARAMS, operation_ref="b")
-    engine.jobs.outcome = EngineError("odd")
+        await backend(engine_with(Raises(NoCapacity("busy")))).open_reply(UUID(int=1), HI, PARAMS, "a")
     with pytest.raises(ReplyFailed) as plain:
-        await backend.open_reply(UUID(int=1), turns, PARAMS, operation_ref="c")
+        await backend(engine_with(Raises(EngineError("odd")))).open_reply(UUID(int=1), HI, PARAMS, "c")
     assert plain.value.payment_sent is False
-    engine.jobs.outcome = JobFailed(
-        job(
-            state="failed",
-            failure=Failure(kind="runner_error", message="500", body="trace", payment_sent=True),
-        )
-    )
+    paid_failure = Fails(message="500", body="trace", payment_sent=True)
     with pytest.raises(ReplyFailed) as paid:
-        await backend.open_reply(UUID(int=1), turns, PARAMS, operation_ref="d")
+        await backend(engine_with(paid_failure)).open_reply(UUID(int=1), HI, PARAMS, "d")
     assert paid.value.payment_sent and "trace" in str(paid.value)
-    engine.jobs.outcome = JobFailed(job(state="failed", failure=None))
-    with pytest.raises(ReplyFailed):
-        await backend.open_reply(UUID(int=1), turns, PARAMS, operation_ref="e")
+    with pytest.raises(ChatUnavailable):
+        await backend(engine_with(Fails(kind="no_offering", message="none"))).open_reply(
+            UUID(int=1), HI, PARAMS, "e"
+        )
+
+
+async def test_a_repeated_operation_ref_is_a_conflict() -> None:
+    chat = backend(engine_with())
+    await chat.open_reply(UUID(int=1), HI, PARAMS, operation_ref="same")
+    with pytest.raises(Conflict):  # the engine refuses to dispatch the same operation twice
+        await chat.open_reply(UUID(int=1), HI, PARAMS, operation_ref="same")

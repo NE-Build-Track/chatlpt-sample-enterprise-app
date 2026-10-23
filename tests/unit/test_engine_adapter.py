@@ -4,9 +4,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
-from livepeer_builder.contracts import CostSummary, Failure, Job
-from livepeer_builder.contracts.costs import AttemptCost, Fees, JobCost
-from livepeer_builder.errors import JobFailed
+from livepeer_builder import AttemptCost, CostSummary, Failure, Fees, Job, JobCost, JobFailed
 
 from chatlpt.adapters.engine import (
     failure_from,
