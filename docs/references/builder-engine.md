@@ -1,8 +1,8 @@
 # livepeer-builder (embedded)
 
-Pinned to branch **`tasks/mz/dependency-injection-refactor`** of `NE-Build-Track/livepeer-builder-core`
-at commit `a22bc98` (2026-10-23: the dependency-injection refactor on `releases/m3` `6c5c689`, plan 08,
-with the PR #41 review fixes; `JourneyApi` renamed `ActorApi` in builder-core decision 14).
+Pinned to branch **`releases/m3`** of `NE-Build-Track/livepeer-builder-core` at commit `878e4f4`
+(2026-10-23: the merge of PR #42, after PR #41, the dependency-injection refactor, plan 08;
+`JourneyApi` renamed `ActorApi` in builder-core decision 14).
 Before that `releases/m3` at `ad6bba9` (2026-10-21: the merge of PR #28, streaming, and PR #31,
 gateway `3238731` and D41), and before that the
 streaming branch `tasks/m3/mz/stream-support` at `93756ba` (2026-10-21: the PR #28 review fixes, D40), `a89216d` (2026-10-20: the stream
