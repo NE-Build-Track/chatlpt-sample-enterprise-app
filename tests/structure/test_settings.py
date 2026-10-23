@@ -1,4 +1,4 @@
-"""Settings are values (docs/exec-plans/active/plan-08-dependency-injection.md).
+"""Settings are values (docs/exec-plans/completed/plan-08-dependency-injection.md).
 
 Only config.py reads the environment (``Settings.from_env``; builder-core's ``EngineSettings.from_env``
 reads ``LPB_*``). Everything else receives settings, so tests build them in code instead of setting

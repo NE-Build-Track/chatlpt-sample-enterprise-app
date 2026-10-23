@@ -30,12 +30,12 @@ changes beyond the refactor branch (its `FakeEngine` gaps found here were fixed 
 
 ## Acceptance
 
-- [ ] `uv run pytest`, ruff, mypy, `scripts/check_docs.py` pass; coverage floors hold.
-- [ ] No module or test imports `livepeer_gateway` or a non-public `livepeer_builder` module.
-- [ ] Outside the CLI's own tests (the CLI reads the environment by design), no test sets or deletes an
+- [x] `uv run pytest`, ruff, mypy, `scripts/check_docs.py` pass; coverage floors hold.
+- [x] No module or test imports `livepeer_gateway` or a non-public `livepeer_builder` module.
+- [x] Outside the CLI's own tests (the CLI reads the environment by design), no test sets or deletes an
   `LPB_*` variable; only `config.py` reads the environment (a structural test).
 - [x] A failure while building the application closes the store it opened (a failing-first test).
-- [ ] References (`builder-engine.md`, `payment-stack.md`, SECURITY, ARCHITECTURE, `.env.example`) and D2 updated.
+- [x] References (`builder-engine.md`, `payment-stack.md`, SECURITY, ARCHITECTURE, `.env.example`) and D2 updated.
 
 ## Progress
 
@@ -63,6 +63,11 @@ changes beyond the refactor branch (its `FakeEngine` gaps found here were fixed 
   every step and logs `app.stop_failed` for one that fails; `chatlpt serve` stops the application in a
   `finally`, for a failure before the HTTP lifespan runs. Each behaviour failed its test first; stopping
   twice is tested as harmless.
+- 2026-10-23: `LPB_BATTERIES_OPERATOR_TOKEN` is out of `.env.example`, SECURITY and the references (the
+  engine's grant desk is off without it; ChatLPT never uses it). `builder-engine.md` describes `create`,
+  the decorator, `jobs.streaming`, `JourneyApi` and `FakeEngine`; D2 records the pin. The pin to an
+  unmerged branch is T9. Acceptance met; plan complete. Not done here: a reply through the deployed
+  stack on this build.
 
 ## Decision log
 
