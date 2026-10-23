@@ -40,6 +40,10 @@ changes beyond the refactor branch (its `FakeEngine` gaps found here were fixed 
 
 - 2026-10-23: plan opened. Re-pinned to `bdf2630`: 2 tests and mypy fail on `from_settings` and
   `jobs.stream`; with `hasattr`, the runtime would silently fall back to the buffered adapter.
+- 2026-10-23: built with `create`; the streaming adapter is picked by `jobs.streaming` (`348c54b`).
+- 2026-10-23: discovery decorates `parts.discovery_source` (`FilteredDiscovery`); ChatLPT no longer imports
+  `livepeer_gateway` (now allowed nowhere) or `livepeer_builder.adapters.sdk`. The default's signer header
+  and discovery URL now reach discovery, which the replacement had dropped.
 
 ## Decision log
 

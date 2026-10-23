@@ -69,7 +69,7 @@ packages = ["chatlpt"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["authlib", "authlib.*", "livepeer_gateway", "livepeer_gateway.*"]
+module = ["authlib", "authlib.*"]
 ignore_missing_imports = true
 
 [tool.coverage.run]
