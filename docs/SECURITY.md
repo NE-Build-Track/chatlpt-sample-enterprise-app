@@ -5,7 +5,7 @@
 | Holder | Credential | Never reaches |
 | --- | --- | --- |
 | Browser | signed session cookie (HTTP-only, SameSite=Lax) | anything else |
-| App process | `CHATLPT_SESSION_SECRET`, OAuth client secrets, `LPB_SHARED_PAYMENT_KEY`, `LPB_BATTERIES_TOKEN`, `LPB_BATTERIES_OPERATOR_TOKEN`, `LPB_SECRET_KEY` | logs, responses, client bundles |
+| App process | `CHATLPT_SESSION_SECRET`, OAuth client secrets, `LPB_SHARED_PAYMENT_KEY`, `LPB_BATTERIES_TOKEN`, `LPB_SECRET_KEY` | logs, responses, client bundles |
 | Signer container | payer keystore + password, RPC URL, webhook token, Kafka credentials | the app |
 | Batteries container | its credentials file | the app (it sees only the management token) |
 

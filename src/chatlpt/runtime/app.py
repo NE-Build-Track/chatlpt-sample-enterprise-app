@@ -3,10 +3,12 @@
 import asyncio
 import contextlib
 import logging
-import os
+from collections.abc import Awaitable, Callable
 from datetime import timedelta
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+
+from livepeer_builder import ActorApi, EngineSettings
 
 from chatlpt.adapters.clock import SystemClock
 from chatlpt.adapters.images import LocalImageFiles
@@ -61,7 +63,7 @@ class Application:
         hasher: PasswordHasher,
         prices: PriceSource,
         oauth: dict[str, OAuthProvider],
-        engine: object | None = None,
+        engine: ActorApi | None = None,
         metadata: ModelMetadataSource | None = None,
         image_backend: ImageBackend | None = None,
         image_files: ImageFiles | None = None,
@@ -129,21 +131,32 @@ class Application:
         self._stop = asyncio.Event()
 
     @classmethod
-    async def from_settings(cls, settings: Settings | None = None) -> "Application":
-        settings = settings or Settings.from_env()
-        if os.environ.get("CHATLPT_ADMIN_EMAILS"):
-            _LOG.warning(
-                "CHATLPT_ADMIN_EMAILS is no longer read; grant admin with `chatlpt make-admin EMAIL` (D26)",
-                extra={"event": "config.admin_emails_ignored"},
-            )
+    async def from_settings(cls, settings: Settings, engine_settings: EngineSettings) -> "Application":
+        """The composition root: ChatLPT's settings and the embedded engine's, both as values.
+
+        What opens goes on an exit stack at once, so a failure part-way closes it (the engine is stopped,
+        the store closed). On success the application owns both and ``stop()`` releases them.
+        """
+        async with contextlib.AsyncExitStack() as opened:
+            app = await cls._build(settings, engine_settings, opened)
+            opened.pop_all()
+            return app
+
+    @classmethod
+    async def _build(
+        cls, settings: Settings, engine_settings: EngineSettings, opened: contextlib.AsyncExitStack
+    ) -> "Application":
         clock = SystemClock()
         store = await SqlStore.connect(settings.database_url, migrate=settings.auto_migrate)
+        opened.push_async_callback(store.close)
         apps = frozenset({settings.chat_app} | ({settings.image_app} if settings.tools_enabled else set()))
         built = await build_engine(
-            apps=apps, approved_hosts=settings.approved_orchestrator_hosts, clock=clock
+            engine_settings, apps=apps, approved_hosts=settings.approved_orchestrator_hosts, clock=clock
         )
+        if built is not None:
+            opened.push_async_callback(built[0].stop)
         backend: ChatBackend | None = None
-        engine: object | None = None
+        engine: ActorApi | None = None
         metadata: ModelMetadataSource | None = None
         image_backend: ImageBackend | None = None
         if built is not None:
@@ -153,7 +166,7 @@ class Application:
             engine, metadata = built
             if settings.tools_enabled:
                 image_backend = EngineImages(engine, app=settings.image_app)
-            adapter = StreamingEngineChat if hasattr(engine.jobs, "stream") else BufferedEngineChat
+            adapter = StreamingEngineChat if engine.jobs.streaming is not None else BufferedEngineChat
             backend = adapter(
                 engine, clock, app=settings.chat_app, idle_timeout_s=settings.reply_idle_timeout_s
             )
@@ -183,7 +196,7 @@ class Application:
 
     async def start(self) -> None:
         if self._engine is not None:
-            await self._engine.start()  # type: ignore[attr-defined]
+            await self._engine.start()
         self._stop.clear()
         self._tasks = [
             asyncio.create_task(self._retention_loop(), name="image-retention"),
@@ -200,10 +213,15 @@ class Application:
             with contextlib.suppress(asyncio.CancelledError):
                 await task
         self._tasks = []
-        await self.chat.drain()
+        steps: list[tuple[str, Callable[[], Awaitable[None]]]] = [("chat", self.chat.drain)]
         if self._engine is not None:
-            await self._engine.stop()  # type: ignore[attr-defined]
-        await self.store.close()
+            steps.append(("engine", self._engine.stop))
+        steps.append(("store", self.store.close))
+        for name, step in steps:  # every step runs: a stuck engine must not keep the database open
+            try:
+                await step()
+            except Exception:
+                _LOG.exception("shutdown step failed", extra={"event": "app.stop_failed", "step": name})
         _LOG.info("application stopped", extra={"event": "app.stopped"})
 
     def billing_prices(self) -> PriceTable:

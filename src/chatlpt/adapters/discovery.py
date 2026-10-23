@@ -1,87 +1,66 @@
-"""ChatLPT's DiscoverySource for the engine: our app on approved hosts (D8), plus runner metadata (D14).
+"""ChatLPT's discovery filter, a decorator over the engine's configured source (D8, D14).
 
-The signer's discovery entries carry an app-controlled ``metadata`` string. The BlueClaw chat runner
-publishes ``{"model_id": ..., "max_context": ...}`` in it, which is the model's own statement of its
-context window, free of charge. builder-core's ``Runner`` contract drops that field, so this source
-reads the raw entries itself, hands the engine the same ``Runner`` contracts the default source would,
-and keeps the metadata for ``ContextService``. The only module importing ``livepeer_gateway``.
+The engine builds its default ``DiscoverySource`` from ``LPB_*`` settings (the signer, or
+``LPB_DISCOVERY_URL``, with the signer header). This wraps that source: only our apps on approved
+orchestrators reach the engine (D8), and each runner's ``metadata`` is read as the model's own
+statement of its context window (D14), kept for ``ContextService``. The BlueClaw chat runner publishes
+``{"model_id": ..., "max_context": ...}`` there.
 """
 
 import json
 import logging
-from collections.abc import Awaitable, Callable
-from typing import Any
 from urllib.parse import urlparse
 
 from livepeer_builder import Runner
-from livepeer_builder.adapters.sdk import runners_from_entries
-from livepeer_gateway.discovery import discover_runners
+from livepeer_builder.protocols import DiscoverySource
 
 from chatlpt.contracts import ModelInfo
 from chatlpt.protocols import Clock
 
 _LOG = logging.getLogger(__name__)
-Discover = Callable[..., Awaitable[list[dict[str, Any]]]]
 
 
-class FilteredSignerDiscovery:
+class FilteredDiscovery:
     def __init__(
-        self,
-        *,
-        signer_url: str | None,
-        discovery_url: str | None,
-        apps: frozenset[str],
-        hosts: frozenset[str],
-        clock: Clock,
-        discover: Discover = discover_runners,
+        self, inner: DiscoverySource, *, apps: frozenset[str], hosts: frozenset[str], clock: Clock
     ) -> None:
-        self._signer_url = signer_url
-        self._discovery_url = discovery_url
+        self._inner = inner
         self._apps = apps
         self._hosts = hosts
         self._clock = clock
-        self._discover = discover
         self._models: dict[str, ModelInfo] = {}
 
     async def fetch(self) -> tuple[Runner, ...]:
-        entries = await self._discover(
-            signer_url=self._signer_url, discovery_url=self._discovery_url, app=sorted(self._apps)
-        )
-        kept: list[dict[str, Any]] = []
-        dropped = 0
+        """The inner source's runners for our apps on approved hosts. Its errors propagate: the engine
+        keeps its last good snapshot and reports the error in health."""
+        ours = [runner for runner in await self._inner.fetch() if runner.app in self._apps]
+        kept = [runner for runner in ours if self._host_ok(runner.orchestrator_url)]
         advertised: dict[str, list[ModelInfo]] = {}
-        for entry in entries:
-            if not isinstance(entry, dict):
-                continue
-            raw_runners = entry.get("runners") or ()
-            runners = [r for r in raw_runners if isinstance(r, dict) and r.get("app") in self._apps]
-            if not runners or not self._host_ok(entry.get("address")):
-                dropped += len(runners) if runners else 0
-                continue
-            kept.append({**entry, "runners": runners})
-            for runner in runners:
-                info = self._parse(str(runner.get("app")), runner.get("metadata"))
-                if info is not None:
-                    advertised.setdefault(info.app, []).append(info)
+        for runner in kept:
+            info = self._parse(runner.app, runner.metadata)
+            if info is not None:
+                advertised.setdefault(info.app, []).append(info)
         for app, infos in advertised.items():
             # Orchestrators advertise different limits for the same app (19 October: 40960 vs 131072). The
             # engine may pick any of them, so the smallest window is the one every reply fits in.
             self._models[app] = min(infos, key=lambda m: m.max_model_len)
-        if dropped:
-            _LOG.debug("discovery filtered", extra={"event": "discovery.filtered", "dropped": dropped})
-        return tuple(runners_from_entries(kept))
+        if len(kept) < len(ours):
+            _LOG.debug(
+                "discovery filtered", extra={"event": "discovery.filtered", "dropped": len(ours) - len(kept)}
+            )
+        return tuple(kept)
 
     def model_from_discovery(self, app: str) -> ModelInfo | None:
         return self._models.get(app)
 
-    def _host_ok(self, url: object) -> bool:
+    def _host_ok(self, url: str | None) -> bool:
         if not self._hosts:
             return True
-        host = urlparse(url).hostname if isinstance(url, str) else None
+        host = urlparse(url).hostname if url else None
         return host is not None and host.lower() in self._hosts
 
-    def _parse(self, app: str, metadata: object) -> ModelInfo | None:
-        if not isinstance(metadata, str) or not metadata:
+    def _parse(self, app: str, metadata: str | None) -> ModelInfo | None:
+        if not metadata:
             return None
         try:
             parsed = json.loads(metadata)

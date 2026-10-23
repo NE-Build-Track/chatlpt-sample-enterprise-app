@@ -31,8 +31,9 @@ reachable by the app on the compose network. Nothing is published to the host ex
    `LPB_SHARED_ALLOCATION_ID` in `deploy/.env`.
 
 The app reads `LPB_ALLOCATION_MODE=per_application`, `LPB_SIGNER_URL=http://clearinghouse:8937`,
-`LPB_BATTERIES_URL=http://clearinghouse:8081`, `LPB_BATTERIES_TOKEN`, `LPB_BATTERIES_OPERATOR_TOKEN`,
-`LPB_SECRET_KEY`, `LPB_DATABASE_URL=sqlite+aiosqlite:////data/livepeer-builder.db`.
+`LPB_BATTERIES_URL=http://clearinghouse:8081`, `LPB_BATTERIES_TOKEN`, `LPB_SECRET_KEY`,
+`LPB_DATABASE_URL=sqlite+aiosqlite:////data/livepeer-builder.db`. It does not need
+`LPB_BATTERIES_OPERATOR_TOKEN` (the engine's grant desk, which the app never uses).
 
 ## Prerequisites
 

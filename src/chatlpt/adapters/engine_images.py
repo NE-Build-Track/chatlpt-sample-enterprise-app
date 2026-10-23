@@ -4,7 +4,8 @@ from typing import Any
 from uuid import UUID
 
 from livepeer_builder import (
-    BuilderEngine,
+    ActorApi,
+    EngineError,
     JobFailed,
     JobRequest,
     NoCapacity,
@@ -13,7 +14,6 @@ from livepeer_builder import (
     OperationExists,
     ProviderUnavailable,
 )
-from livepeer_builder.errors import EngineError
 
 from chatlpt.adapters.engine import actor_for, failure_from
 from chatlpt.errors import ChatUnavailable, Conflict, ReplyFailed
@@ -43,7 +43,7 @@ class EngineImageResult:
 class EngineImages:
     """The ImageBackend: one buffered ``jobs.run`` per picture on the fal FLUX app (D25)."""
 
-    def __init__(self, engine: BuilderEngine, *, app: str, max_attempts: int = 2) -> None:
+    def __init__(self, engine: ActorApi, *, app: str, max_attempts: int = 2) -> None:
         self._engine = engine
         self.app = app
         self._max_attempts = max_attempts

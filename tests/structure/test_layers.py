@@ -32,9 +32,9 @@ CONFINED: dict[str, tuple[str, ...]] = {
         "adapters/engine.py",
         "adapters/engine_images.py",
         "adapters/discovery.py",
-        "runtime/engine.py",
+        "runtime/",
     ),
-    "livepeer_gateway": ("adapters/discovery.py",),
+    "livepeer_gateway": (),  # the engine owns the SDK; discovery decorates the engine's source
     "authlib": ("adapters/oauth.py",),
     "httpx": ("adapters/oauth.py", "adapters/images.py"),
     "argon2": ("adapters/passwords.py",),
@@ -107,6 +107,11 @@ def test_third_party_packages_are_confined(path: Path) -> None:
         homes = CONFINED.get(package)
         if homes is None or any(relative.startswith(home) for home in homes):
             continue
+        if not homes:
+            pytest.fail(
+                f"{relative}:{line} imports {package}, which ChatLPT does not use directly. The engine owns it; "
+                "reach it through the engine (decorate a part in runtime/engine.py)."
+            )
         pytest.fail(
             f"{relative}:{line} imports {package}, which is confined to {homes}. Wrap it behind a protocol "
             f"and implement that protocol in the owning module (ARCHITECTURE.md#third-party-boundaries)."

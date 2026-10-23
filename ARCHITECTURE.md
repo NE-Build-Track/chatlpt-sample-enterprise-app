@@ -63,8 +63,8 @@ Each third-party package is confined to one module (enforced by `tests/structure
 
 | Package | Only in |
 | --- | --- |
-| `livepeer_builder` | `adapters/engine.py`, `adapters/engine_images.py`, `adapters/discovery.py`, `runtime/engine.py` |
-| `livepeer_gateway` (discovery only) | `adapters/discovery.py` |
+| `livepeer_builder` | `adapters/engine.py`, `adapters/engine_images.py`, `adapters/discovery.py`, `runtime/` (the composition root) |
+| `livepeer_gateway` | nowhere: the engine owns the SDK; discovery decorates the engine's source |
 | `authlib` | `adapters/oauth.py` |
 | `httpx` | `adapters/oauth.py`, `adapters/images.py` |
 | `argon2` | `adapters/passwords.py` |

@@ -1,6 +1,9 @@
 """Settings come from CHATLPT_* variables and derive the approved hosts."""
 
+import logging
 from decimal import Decimal
+
+import pytest
 
 from chatlpt.config import Settings
 
@@ -29,3 +32,12 @@ def test_approved_hosts_are_parsed_from_urls() -> None:
             "ai1.eliteencoder.net",
         }
     )
+
+
+def test_a_leftover_admin_emails_variable_is_named_in_a_warning(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.WARNING):
+        Settings.from_env({"CHATLPT_ADMIN_EMAILS": "A@x.io"})
+    assert [r.event for r in caplog.records] == ["config.admin_emails_ignored"]  # type: ignore[attr-defined]
+    caplog.clear()
+    Settings.from_env({})
+    assert not caplog.records

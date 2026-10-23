@@ -1,9 +1,9 @@
 """The ChatBackend over the embedded livepeer-builder engine (docs/references/builder-engine.md).
 
-Two implementations of the same port (D20): ``StreamingEngineChat`` uses the engine's ``jobs.stream``
+Two implementations of the same port (D20): ``StreamingEngineChat`` uses the engine's ``jobs.streaming``
 and yields reply deltas as the runner emits them (docs/design-docs/streaming-through-the-engine.md);
 ``BufferedEngineChat`` uses ``jobs.run`` and yields the whole body at the end, for an engine without
-streaming. The runtime picks the first when the engine offers ``jobs.stream``.
+streaming. The runtime picks the first when the engine offers ``jobs.streaming``.
 """
 
 import json
@@ -15,20 +15,22 @@ from typing import Any
 from uuid import UUID
 
 from livepeer_builder import (
+    ActorApi,
     ActorContext,
-    BuilderEngine,
     CostSummary,
+    EngineError,
     JobCost,
     JobFailed,
     JobRequest,
+    JobResult,
+    JobStreamApi,
     NoCapacity,
     NotProvisioned,
     OperationConflict,
     OperationExists,
     ProviderUnavailable,
 )
-from livepeer_builder.errors import EngineError
-from livepeer_builder.errors import NotFound as EngineNotFound
+from livepeer_builder import NotFound as EngineNotFound
 
 from chatlpt.adapters.openai_wire import ToolCallAssembler, parse_tool_calls, wire_turn
 from chatlpt.adapters.sse import SseDecoder
@@ -87,7 +89,7 @@ class BufferedReply:
 class BufferedEngineChat:
     def __init__(
         self,
-        engine: BuilderEngine,
+        engine: ActorApi,
         clock: Clock,
         *,
         app: str,
@@ -218,7 +220,7 @@ class BufferedEngineChat:
         except EngineError as exc:
             raise ChatUnavailable(str(exc)) from exc
 
-    async def _run(self, user_id: UUID, request: JobRequest) -> Any:
+    async def _run(self, user_id: UUID, request: JobRequest) -> JobResult:
         try:
             return await self._engine.jobs.run(actor_for(user_id), request)
         except JobFailed as exc:
@@ -234,14 +236,13 @@ class BufferedEngineChat:
 class StreamingReply:
     """The ReplyStream over the engine's ``JobStream``: SSE frames become reply chunks as they arrive."""
 
-    def __init__(self, job_stream: Any, orchestrator_url: str | None) -> None:
+    def __init__(self, job_stream: JobStreamApi, orchestrator_url: str | None) -> None:
         self._stream = job_stream
         self._orchestrator_url = orchestrator_url
 
     @property
     def job_id(self) -> UUID | None:
-        job_id = self._stream.job.id
-        return job_id if isinstance(job_id, UUID) else None
+        return self._stream.job.id
 
     @property
     def orchestrator_url(self) -> str | None:
@@ -251,7 +252,7 @@ class StreamingReply:
         return self._iterate()
 
     async def _iterate(self) -> AsyncIterator[ReplyChunk]:
-        if not str(self._stream.content_type).startswith("text/event-stream"):
+        if not self._stream.content_type.startswith("text/event-stream"):
             # The runner answered with one body (no stream support, or an error document): parse it whole.
             body = b"".join([chunk async for chunk in self._stream])
             try:
@@ -289,7 +290,26 @@ class StreamingReply:
 
 
 class StreamingEngineChat(BufferedEngineChat):
-    """``jobs.stream`` per reply: the browser sees tokens as the runner produces them (D1, D20)."""
+    """``jobs.streaming`` per reply: the browser sees tokens as the runner produces them (D1, D20).
+
+    Built only for an engine that offers the streaming capability; the runtime checks
+    ``engine.jobs.streaming`` and picks ``BufferedEngineChat`` otherwise.
+    """
+
+    def __init__(
+        self,
+        engine: ActorApi,
+        clock: Clock,
+        *,
+        app: str,
+        max_attempts: int = 3,
+        idle_timeout_s: float | None = None,
+    ) -> None:
+        super().__init__(engine, clock, app=app, max_attempts=max_attempts, idle_timeout_s=idle_timeout_s)
+        streaming = engine.jobs.streaming
+        if streaming is None:
+            raise ValueError("this engine's transport cannot stream; use BufferedEngineChat")
+        self._streaming = streaming
 
     async def open_reply(  # type: ignore[override]
         self,
@@ -301,7 +321,7 @@ class StreamingEngineChat(BufferedEngineChat):
     ) -> StreamingReply:
         request = self._request(turns, params, operation_ref, stream=True, tools=tools)
         try:
-            job_stream = await self._engine.jobs.stream(actor_for(user_id), request)
+            job_stream = await self._streaming.stream(actor_for(user_id), request)
         except JobFailed as exc:
             raise failure_from(exc) from exc
         except (NoCapacity, NotProvisioned, ProviderUnavailable) as exc:

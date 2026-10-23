@@ -22,7 +22,7 @@ from typing import Any
 
 from chatlpt.config import Settings
 from chatlpt.errors import AppError
-from chatlpt.runtime import Application, package_version
+from chatlpt.runtime import Application, engine_settings_from_env, package_version
 from chatlpt.runtime.logging import configure_logging
 from chatlpt.store import SqlStore, current_revision, head_revision, upgrade
 
@@ -116,7 +116,7 @@ async def _gen_secret(_: argparse.Namespace) -> None:
 async def _smoke(_: argparse.Namespace) -> int:
     settings = Settings.from_env()
     configure_logging(json_lines=settings.log_json)
-    app = await Application.from_settings(settings)
+    app = await Application.from_settings(settings, engine_settings_from_env())
     await app.start()
     try:
         health = await app.health()
@@ -133,17 +133,20 @@ async def _serve(_: argparse.Namespace) -> None:
 
     settings = Settings.from_env()
     configure_logging(json_lines=settings.log_json)
-    app = await Application.from_settings(settings)
-    server = uvicorn.Server(
-        uvicorn.Config(
-            create_app(app),
-            host=settings.http_host,
-            port=settings.http_port,
-            log_config=None,
-            access_log=False,
+    app = await Application.from_settings(settings, engine_settings_from_env())
+    try:
+        server = uvicorn.Server(
+            uvicorn.Config(
+                create_app(app),
+                host=settings.http_host,
+                port=settings.http_port,
+                log_config=None,
+                access_log=False,
+            )
         )
-    )
-    await server.serve()
+        await server.serve()
+    finally:
+        await app.stop()  # the lifespan stops it too when the server ran; a second stop is harmless
 
 
 async def _gen_docs(args: argparse.Namespace) -> int:
