@@ -1,8 +1,10 @@
 # livepeer-builder (embedded)
 
-Pinned to branch **`releases/m3`** of `NE-Build-Track/livepeer-builder-core` at commit `878e4f4`
-(2026-10-23: the merge of PR #42, after PR #41, the dependency-injection refactor, plan 08;
-`JourneyApi` renamed `ActorApi` in builder-core decision 14).
+Pinned to branch **`releases/m3`** of `NE-Build-Track/livepeer-builder-core` at commit `629f1ab`
+(2026-10-24: the merge of PR #44, after PR #43: a paid job's cost never reads `none`, and payment
+evidence is stored when the signer signs, builder-core D42; migration `0005`, applied on start).
+Before that `878e4f4` (2026-10-23: the merge of PR #42, after PR #41, the dependency-injection
+refactor, plan 08; `JourneyApi` renamed `ActorApi` in builder-core decision 14).
 Before that `releases/m3` at `ad6bba9` (2026-10-21: the merge of PR #28, streaming, and PR #31,
 gateway `3238731` and D41), and before that the
 streaming branch `tasks/m3/mz/stream-support` at `93756ba` (2026-10-21: the PR #28 review fixes, D40), `a89216d` (2026-10-20: the stream
@@ -20,8 +22,8 @@ lifecycle fixes, D34–D39), `973ac57`
 | A reply | `engine.jobs.streaming.stream(actor, JobRequest(app="blueclaw/chat/qwen3.8-27b", path="/v1/chat/completions", payload={..., "stream": true, "stream_options": {"include_usage": true}}, operation_ref=..., max_attempts=..., timeout_s=..., idle_timeout_s=...))` | A `JobStream` of SSE bytes. `jobs.streaming` is `None` when the transport cannot stream; then `jobs.run` |
 | Model limits | the same, `method="GET"`, `path="/v1/models"` | Billed per second (tiny); cached (D14) |
 | Token usage | `engine.jobs.report_usage(actor, job_id, {"prompt_tokens": n, ...})` | Once per job, owner only, succeeded jobs only |
-| Network cost of a job | `engine.costs.for_job(actor, job_id)`, each time it is shown (D29) | `pending` until Batteries reports; then `delivered`, `failed_after_payment`, `uncertain`; `none` = nothing paid ($0) |
-| A user's network totals | `engine.costs.summary(actor, start, end)` | By class; `jobs_pending` beside the totals. A finished job gets its cost record within one engine cost-sync cycle (30 s) |
+| Network cost of a job | `engine.costs.for_job(actor, job_id)`, each time it is shown (D29) | `pending` while the job runs and until Batteries reports, never `none` for a paid job; then `delivered`, `failed_after_payment`, `uncertain`; `none` = the job ended and nothing was paid ($0) |
+| A user's network totals | `engine.costs.summary(actor, start, end)` | By class; `jobs_pending` beside the totals. Running and just-finished jobs count as `pending` straight away; a finished job's cost settles within one engine cost-sync cycle (30 s) |
 | Allowance | `engine.payments.allowance(actor)` | The shared allocation's granted/spent/available |
 
 ## Behavior to design around

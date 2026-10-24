@@ -74,6 +74,9 @@ changes beyond the refactor branch (its `FakeEngine` gaps found here were fixed 
   `a22bc98`. The pin moved there, which pays T9.
 - 2026-10-23: re-pinned to `878e4f4`, the merge of builder-core PR #42: `FakeEngine` settles a cancelled
   stream as the engine does, and the README quick-start test is deterministic.
+- 2026-10-24: re-pinned to `629f1ab`, the merge of builder-core PRs #43 and #44: a paid reply's
+  wholesale cost reads `pending` until it settles (never $0 between syncs), and a cancelled or
+  disconnected reply keeps its charge on the job. ChatLPT code is unchanged.
 
 ## Decision log
 
