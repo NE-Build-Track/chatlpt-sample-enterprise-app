@@ -1,8 +1,12 @@
 # livepeer-builder (embedded)
 
-Pinned to branch **`releases/m3`** of `NE-Build-Track/livepeer-builder-core` at commit `629f1ab`
-(2026-10-24: the merge of PR #44, after PR #43: a paid job's cost never reads `none`, and payment
-evidence is stored when the signer signs, builder-core D42; migration `0005`, applied on start).
+Pinned to branch **`tasks/mz/discovery-service`** of `NE-Build-Track/livepeer-builder-core` at commit
+`985f23d` (2026-10-26, builder-core #45 and D43): runners come from builder-core's discovery service
+(`LPB_DISCOVERY_URL`, the `discovery` service in `deploy/compose.yaml`, static directory
+`deploy/config/orchestrators.txt`), and the signer only signs. Re-pin to the merge on `releases/m3`.
+Before that `releases/m3` `629f1ab` (2026-10-24: the merge of PR #44, after PR #43: a paid job's cost
+never reads `none`, and payment evidence is stored when the signer signs, builder-core D42; migration
+`0005`, applied on start).
 Before that `878e4f4` (2026-10-23: the merge of PR #42, after PR #41, the dependency-injection
 refactor, plan 08; `JourneyApi` renamed `ActorApi` in builder-core decision 14).
 Before that `releases/m3` at `ad6bba9` (2026-10-21: the merge of PR #28, streaming, and PR #31,

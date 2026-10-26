@@ -19,13 +19,14 @@ def engine_settings_from_env() -> EngineSettings:
 async def build_engine(
     settings: EngineSettings, *, apps: frozenset[str], approved_hosts: frozenset[str], clock: Clock
 ) -> tuple[BuilderEngine, FilteredDiscovery] | None:
-    """None without a signer or discovery URL: the app runs degraded (chat disabled) rather than failing."""
-    if not settings.signer_url and not settings.discovery_url:
+    """None without both a signer (payment) and a discovery URL (runners): the app runs degraded (chat
+    disabled) rather than failing. The signer only signs; runners come from the discovery service (D43)."""
+    if not settings.signer_url or not settings.discovery_url:
         return None
     filters: list[FilteredDiscovery] = []
 
     def filter_discovery(parts: EngineParts) -> EngineParts:
-        """Decorate the engine's configured source; it keeps the signer header and discovery URL."""
+        """Decorate the engine's configured source (``LPB_DISCOVERY_URL``), never re-create it."""
         filtered = FilteredDiscovery(parts.discovery_source, apps=apps, hosts=approved_hosts, clock=clock)
         filters.append(filtered)
         return dataclasses.replace(parts, discovery_source=filtered)

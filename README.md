@@ -155,16 +155,16 @@ allocation; the amounts are tiny (about $0.00003 for a short reply) but they are
 
 ## Deploy
 
-The compose file runs three services: `clearinghouse` (Batteries with embedded Kafka), `signer`
-(the node remote signer, sharing the clearinghouse network namespace) and `chatlpt`. Only the app is
+The compose file runs four services: `clearinghouse` (Batteries with embedded Kafka), `signer`
+(the node remote signer, sharing the clearinghouse network namespace; it only signs), `discovery`
+(builder-core's discovery service, listing `deploy/config/orchestrators.txt`) and `chatlpt`. Only the app is
 published, on loopback. Put a TLS proxy in front for anything but local use.
 
 ```sh
 cd deploy
 python3 init-secrets.py                      # Batteries creds, engine token, webhook, Kafka users
 # add, mode 0600: secrets/rpc-url, secrets/keystore.json, secrets/keystore-password
-python3 config/pin-orchestrator-certs.py     # pin the approved orchestrators' TLS certificates
-docker compose up -d clearinghouse signer
+docker compose up -d clearinghouse signer discovery
 ./first-run.sh                               # grant + shared allocation key → .env
 docker compose up -d chatlpt
 ```

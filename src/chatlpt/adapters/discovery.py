@@ -1,7 +1,8 @@
 """ChatLPT's discovery filter, a decorator over the engine's configured source (D8, D14).
 
-The engine builds its default ``DiscoverySource`` from ``LPB_*`` settings (the signer, or
-``LPB_DISCOVERY_URL``, with the signer header). This wraps that source: only our apps on approved
+The engine builds its default ``DiscoverySource`` from ``LPB_DISCOVERY_URL``: builder-core's discovery
+service, which lists orchestrators and serves their runners (the signer only signs, builder-core D43).
+This wraps that source: only our apps on approved
 orchestrators reach the engine (D8), and each runner's ``metadata`` is read as the model's own
 statement of its context window (D14), kept for ``ContextService``. The BlueClaw chat runner publishes
 ``{"model_id": ..., "max_context": ...}`` there.

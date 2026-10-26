@@ -17,6 +17,10 @@ from chatlpt.testing import FixedClock, MemoryStore, PlainHasher, StaticPrices
 ROOT = Path(__file__).resolve().parents[2]
 
 
+SIGNER = "http://signer.test:8937"
+DISCOVERY = "http://discovery.test:8939/discovery"
+
+
 def engine_settings(tmp_path: Path, **values: object) -> EngineSettings:
     """The embedded engine's settings as a value; no ``LPB_*`` variable is read or set."""
     return EngineSettings.model_validate(
@@ -24,16 +28,26 @@ def engine_settings(tmp_path: Path, **values: object) -> EngineSettings:
     )
 
 
-async def test_build_engine_is_none_without_a_signer(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "values",
+    [{}, {"signer_url": SIGNER}, {"discovery_url": DISCOVERY}],
+    ids=["neither", "signer only", "discovery only"],
+)
+async def test_build_engine_is_none_without_a_signer_and_a_discovery_url(
+    tmp_path: Path, values: dict[str, str]
+) -> None:  # the signer pays and the discovery service lists runners (builder-core D43); chat needs both
     built = await build_engine(
-        engine_settings(tmp_path), apps=frozenset({"a"}), approved_hosts=frozenset(), clock=FixedClock()
+        engine_settings(tmp_path, **values),
+        apps=frozenset({"a"}),
+        approved_hosts=frozenset(),
+        clock=FixedClock(),
     )
     assert built is None
 
 
-async def test_build_engine_with_a_signer_wires_the_filtered_discovery(tmp_path: Path) -> None:
+async def test_build_engine_with_a_signer_and_discovery_wires_the_filtered_discovery(tmp_path: Path) -> None:
     built = await build_engine(
-        engine_settings(tmp_path, signer_url="http://signer.test:8937"),
+        engine_settings(tmp_path, signer_url=SIGNER, discovery_url=DISCOVERY),
         apps=frozenset({"a"}),
         approved_hosts=frozenset({"h"}),
         clock=FixedClock(),
@@ -92,7 +106,7 @@ async def test_runtime_picks_the_streaming_adapter_when_the_engine_streams(tmp_p
         pricing_file=str(ROOT / "config" / "pricing" / "qwen3.8-27b.json"),
     )
     app = await Application.from_settings(
-        settings, engine_settings(tmp_path, signer_url="http://signer.test:8937")
+        settings, engine_settings(tmp_path, signer_url=SIGNER, discovery_url=DISCOVERY)
     )
     try:
         assert isinstance(app.backend, StreamingEngineChat)
@@ -132,7 +146,7 @@ async def test_a_failure_while_building_closes_what_was_opened(
     )
     with pytest.raises(InvalidRequest, match="pricing file"):
         await Application.from_settings(
-            settings, engine_settings(tmp_path, signer_url="http://signer.test:8937")
+            settings, engine_settings(tmp_path, signer_url=SIGNER, discovery_url=DISCOVERY)
         )
     assert len(closed) == 1
     with pytest.raises(RuntimeError, match="engine is stopped"):
@@ -173,7 +187,8 @@ async def test_stopping_twice_is_harmless(tmp_path: Path, caplog: pytest.LogCapt
         pricing_file=str(ROOT / "config" / "pricing" / "qwen3.8-27b.json"),
     )
     app = await Application.from_settings(
-        settings, engine_settings(tmp_path, signer_url="http://signer.test:8937")
+        settings,
+        engine_settings(tmp_path, signer_url=SIGNER, discovery_url=DISCOVERY),  # an engine to stop twice
     )
     await app.start()
     await app.stop()  # the HTTP lifespan's stop

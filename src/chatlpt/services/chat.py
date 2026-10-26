@@ -171,7 +171,9 @@ class ChatService:
 
     def _ready(self) -> ChatBackend:
         if self._backend is None:
-            raise ChatUnavailable("chat is not configured: the engine has no signer (LPB_SIGNER_URL)")
+            raise ChatUnavailable(
+                "chat is not configured: the engine needs LPB_SIGNER_URL and LPB_DISCOVERY_URL"
+            )
         available, reason = self._backend.ready()
         if not available:
             raise ChatUnavailable(reason or "the model is not available right now")

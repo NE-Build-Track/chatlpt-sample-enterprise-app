@@ -11,11 +11,11 @@ if [ -f deploy/.env ]; then
 fi
 export IMAGE_REGISTRY="${IMAGE_REGISTRY:-}"
 SERVICES=("$@")
-[ ${#SERVICES[@]} -eq 0 ] && SERVICES=(clearinghouse signer chatlpt)
+[ ${#SERVICES[@]} -eq 0 ] && SERVICES=(clearinghouse signer discovery chatlpt)
 echo "registry prefix: '${IMAGE_REGISTRY}'"
 for svc in "${SERVICES[@]}"; do
   echo "== building $svc"
   docker compose -f deploy/compose.yaml build --pull "$svc"
 done
-docker images --format '{{.Repository}}:{{.Tag}}  {{.Size}}' | grep -E "chatlpt/(clearinghouse|node|chatlpt)" || true
+docker images --format '{{.Repository}}:{{.Tag}}  {{.Size}}' | grep -E "chatlpt/(clearinghouse|node|discovery|chatlpt)" || true
 echo "built. Publish explicitly with: docker compose -f deploy/compose.yaml push <service>"
