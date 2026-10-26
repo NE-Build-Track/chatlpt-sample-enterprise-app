@@ -91,9 +91,10 @@ Each third-party package is confined to one module (enforced by `tests/structure
   `DefaultPolicy` still applies.
 - Payment runs in `per_application` mode: one shared `lpg_` allocation key for the whole app.
   Jobs still record the actor, so wholesale cost is attributable per user.
-- The engine's discovery source is ours: it reads the signer's entries, keeps runners advertising the
-  chat app on the approved orchestrators, hands the engine standard `Runner` contracts, and remembers the
-  runner's `metadata` (`model_id`, `max_context`) for the context window.
+- The engine's discovery source is decorated: `FilteredDiscovery` wraps the engine's own source (which
+  reads builder-core's discovery service at `LPB_DISCOVERY_URL`), keeps runners advertising our apps on
+  the approved orchestrators, and remembers each runner's `metadata` (`model_id`, `max_context`) for the
+  context window.
 - A reply is `jobs.stream` (D2, plan-06): SSE bytes as the runner produces them. Before 19 October it
   was `jobs.run` in immediate mode (one buffered body); only `adapters/engine.py` changed.
 
@@ -116,3 +117,6 @@ When the model answers with a `generate_image` tool call instead of text, the sa
 the assistant message becomes a `tool_call` message, `services/images.py` runs the image app through the
 engine, fetches the bytes from the runner's temporary URL onto the volume and writes the image's own
 ledger row, and a second model call with the tool result produces the caption as a separate message.
+
+Class and sequence diagrams of all of this, with the builder-core classes on the other side of the
+boundary, are in [docs/design-docs/builder-core-in-chatlpt.md](docs/design-docs/builder-core-in-chatlpt.md).

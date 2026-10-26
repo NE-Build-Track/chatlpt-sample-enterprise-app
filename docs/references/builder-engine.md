@@ -47,7 +47,7 @@ lifecycle fixes, D34–D39), `973ac57`
 ## Extension points we use
 
 - **Decorate** `parts.discovery_source` (`FilteredDiscovery`, `adapters/discovery.py`): the engine's configured
-  source, signer header included, filtered to our apps on D8 hosts; it reads each `Runner.metadata` for the
+  source (`HttpDiscoverySource` on `LPB_DISCOVERY_URL`), filtered to our apps on D8 hosts; it reads each `Runner.metadata` for the
   context window (D14).
 - `SelectionPolicy`: the default `MostCapacityFirst` for now.
 - Everything else: defaults.
