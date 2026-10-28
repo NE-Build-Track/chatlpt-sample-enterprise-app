@@ -107,9 +107,11 @@ def _sum(costs: Sequence[WholesaleCost]) -> NetworkTotals:
         amounts = (c.amount.amount for c in costs if c.status in statuses and c.amount is not None)
         return Money(amount=sum(amounts, Decimal(0)), currency="USD")
 
+    # a delivered reply's failed-over attempts count as failed, as in the engine's summary (D52)
+    failed_over = sum((c.failed.amount for c in costs if c.failed is not None), Decimal(0))
     return NetworkTotals(
         delivered=usd("delivered"),
-        failed=usd(*_FAILED),
+        failed=Money(amount=usd(*_FAILED).amount + failed_over, currency="USD"),
         pending=sum(1 for c in costs if c.status == "pending"),
     )
 

@@ -21,6 +21,13 @@ describe("describeWholesale", () => {
     expect(describeWholesale(null).label).toBe("no network charge");
     expect(describeWholesale({ status: "unknown" }).label).toBe("network unknown");
   });
+
+  it("shows what a failed-over reply delivered and what failed over (builder-core D52)", () => {
+    const money = (amount: string) => ({ amount, currency: "USD" as const });
+    expect(describeWholesale({ status: "delivered", amount: money("0.0002"), failed: money("0.0001") }).label).toBe(
+      "network $0.0002000 · failed over $0.0001000",
+    );
+  });
 });
 
 describe("networkSpent", () => {

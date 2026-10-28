@@ -363,7 +363,9 @@ def failure_from(exc: JobFailed) -> ChatUnavailable | ReplyFailed:
     job_id = exc.job.id if isinstance(exc.job.id, UUID) else None
     if failure is None:
         return ReplyFailed(str(exc), payment_sent=False, job_id=job_id)
-    if failure.kind in _UNAVAILABLE_KINDS:
+    # Unavailable only when nothing was paid: a job can fail over and still end refused after paying
+    # (builder-core D52), and its reply keeps the job so the cost shows.
+    if failure.kind in _UNAVAILABLE_KINDS and not failure.payment_sent:
         return ChatUnavailable(failure.message)
     uncertain = failure.kind in ("timeout", "abandoned") or exc.job.state == "uncertain"
     detail = failure.message if not failure.body else f"{failure.message}: {failure.body[:300]}"
@@ -431,8 +433,19 @@ def wholesale_from(cost: JobCost) -> WholesaleCost:
         if "uncertain" in classes
         else "failed_after_payment"
     )
-    amount = None if cost.fees.fee_usd is None else Money(amount=Decimal(cost.fees.fee_usd), currency="USD")
-    return WholesaleCost(status=status, amount=amount, updated_at=cost.updated_at)
+    total = None if cost.fees.fee_usd is None else Decimal(cost.fees.fee_usd)
+    if status != "delivered" or total is None or cost.billable.fee_usd is None:
+        amount = None if total is None else Money(amount=total, currency="USD")
+        return WholesaleCost(status=status, amount=amount, updated_at=cost.updated_at)
+    # Delivered: the reply's cost is the delivered part; attempts it failed over from are failed (D52).
+    delivered = Decimal(cost.billable.fee_usd)
+    failed = Money(amount=total - delivered, currency="USD") if total > delivered else None
+    return WholesaleCost(
+        status=status,
+        amount=Money(amount=delivered, currency="USD"),
+        failed=failed,
+        updated_at=cost.updated_at,
+    )
 
 
 def network_totals_from(summary: CostSummary) -> NetworkTotals:
