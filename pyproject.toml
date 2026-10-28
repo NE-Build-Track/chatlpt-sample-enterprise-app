@@ -22,9 +22,9 @@ dependencies = [
     "argon2-cffi>=23.1",
     "authlib>=1.3",
     "httpx>=0.27",
-    # D2: tasks/mz/intent-before-signing at cf19831, PR #64 head (D54 manifest stored before signing).
-    # (docs/design-docs/decisions.md). Re-pin to releases/m3 once that pull request merges.
-    "livepeer-builder @ git+https://github.com/NE-Build-Track/livepeer-builder-core.git@cf1983155c9cf87f114d0f5f126dde86c05b23c3",
+    # D2: tasks/mz/intent-before-signing at a866a6b, PR #64 head (D54, and the review fix:
+    # a cancel before signing stores the manifest unpaid). Re-pin to releases/m3 once that pull request merges.
+    "livepeer-builder @ git+https://github.com/NE-Build-Track/livepeer-builder-core.git@a866a6bfae6aea6b95a3cf0349e8063e8cfd2d27",
 ]
 
 [project.scripts]

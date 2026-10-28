@@ -84,6 +84,8 @@ changes beyond the refactor branch (its `FakeEngine` gaps found here were fixed 
 - 2026-10-28: re-pinned to `tasks/mz/intent-before-signing` `cf19831`, the head of builder-core PR #64
   (D54; PR #61 merged as `ea5013c`), to run ChatLPT against the manifest stored before signing.
   Migration `0006` adds `payment_state` to `lpb_payment_sessions` on start. ChatLPT code is unchanged.
+- 2026-10-28: re-pinned to `a866a6b` on the same branch, the PR #64 review fix: a cancel before signing
+  stores the manifest unpaid, and an ambiguous payment key is checked again on the next sync.
 
 ## Decision log
 
