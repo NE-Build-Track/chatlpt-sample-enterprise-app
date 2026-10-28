@@ -3,7 +3,8 @@
 How ChatLPT uses livepeer-builder: the classes on each side of the boundary, and the flows that cross
 it. Every box and message is a real class, method, route or setting in this repository or in
 builder-core, so each diagram leads to the code. The diagrams describe the code pinned to builder-core
-`985f23d`, which has the discovery service (builder-core D43).
+`releases/m3` `2134e29`: the discovery service (builder-core D43), paid failover (D52, D55), the
+engine's own paid call (D53, D54) and `JobCost.billable`.
 
 This is the consumer's view. The engine's own interfaces and its REST server are drawn in builder-core's
 [interfaces-and-http-servers.md](https://github.com/NE-Build-Track/livepeer-builder-core/blob/tasks/mz/interface-walkthrough/docs/design-docs/interfaces-and-http-servers.md).
@@ -418,7 +419,7 @@ sequenceDiagram
     Chat-->>Br: event start
     Chat->>SEC: open_reply(user_id, turns, params, operation_ref=placeholder id, tools)
     SEC->>Eng: stream(actor_for(user_id), JobRequest(stream, include_usage, idle_timeout_s))
-    Note over Eng: admission, attempt, payment, failover before payment
+    Note over Eng: admission, attempt, payment, failover (after payment only to another orchestrator)
     Eng-->>SEC: JobStream
     SEC-->>Chat: StreamingReply(JobStream, orchestrator_url)
     loop runner SSE bytes
@@ -443,14 +444,16 @@ answer as the final turn and `continue_final_message` set; it adds a new assista
 ### When a reply fails
 
 `failure_from` turns the engine's `JobFailed` into ChatLPT's errors, at the adapter. The engine's job
-id stays on the message, so a paid failure still shows its network cost.
+id stays on the message, so a paid failure still shows its network cost. A job can fail over after
+paying and still end `refused` or with its payment refused (builder-core D52), so "unavailable" means
+nothing was paid.
 
 | Engine | ChatLPT | The message | The browser |
 | --- | --- | --- | --- |
-| `JobFailed` with `no_offering`, `no_capacity`, `not_provisioned`, `refused`, `unreachable`, `payment` | `ChatUnavailable` | `failed`, `unavailable` | `error` event with `retry_after_s` |
+| `JobFailed` with `no_offering`, `no_capacity`, `not_provisioned`, `refused`, `unreachable`, `payment`, and nothing paid | `ChatUnavailable` | `failed`, `unavailable` | `error` event with `retry_after_s` |
 | `NoCapacity`, `NotProvisioned`, `ProviderUnavailable` | `ChatUnavailable` | `failed`, `unavailable` | `error` event with `retry_after_s` |
 | `JobFailed` with `timeout` or `abandoned`, or job state `uncertain` | `ReplyFailed(uncertain=True)` | `uncertain`, partial text kept, `job_id` | `error` event |
-| any other `JobFailed` | `ReplyFailed(payment_sent=...)` | `failed`, partial text kept, `job_id` | `error` event |
+| any other `JobFailed`, including a paid `refused`, `unreachable` or `payment` | `ReplyFailed(payment_sent=...)` | `failed`, partial text kept, `job_id` | `error` event |
 | `OperationExists`, `OperationConflict` | `Conflict` | left `streaming` (see question 6) | `error` event |
 | any other `EngineError` | `ReplyFailed(payment_sent=False)` | `failed` | `error` event |
 
@@ -514,6 +517,7 @@ sequenceDiagram
         B->>Eng: for_job(actor, job_id)
         Eng-->>B: JobCost (pending, none, observed, corrected)
         B-->>Net: WholesaleCost (delivered, failed_after_payment, uncertain, pending, none)
+        Note over B,Net: delivered: amount = JobCost.billable, failed = what failed-over attempts cost
     end
     R->>Ledger: conversation_totals(conversation_id) (retail)
     R-->>Br: messages with retail and network cost, totals
@@ -525,7 +529,10 @@ sequenceDiagram
     R-->>Br: UsageTotals (retail, delivered, failed, pending)
 ```
 
-A cost the engine cannot answer is shown as `unknown`, never as $0.
+A cost the engine cannot answer is shown as `unknown`, never as $0. A reply that failed over shows
+"network $X · failed over $Y": its delivered cost and what the attempts before it cost. The
+conversation adds the failed-over part to its failed spend, as the account totals do from the
+engine's summary, so the two views agree.
 
 ## Questions for the review
 
