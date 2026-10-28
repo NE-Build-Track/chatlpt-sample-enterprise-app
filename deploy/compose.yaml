@@ -8,7 +8,7 @@ services:
   clearinghouse:
     image: ${IMAGE_REGISTRY:+${IMAGE_REGISTRY}/}chatlpt/clearinghouse:ca09e47
     build:
-      context: https://github.com/NE-Build-Track/clearinghouse-batteries.git#ca09e47c067682fb48c3f15425546fb6aa5b6659
+      context: https://github.com/livepeer/clearinghouse-batteries.git#ca09e47c067682fb48c3f15425546fb6aa5b6659
       dockerfile: examples/compose/Dockerfile
     command: [serve, --config-file, /etc/clearinghouse.toml]
     volumes:
@@ -24,7 +24,7 @@ services:
   signer:
     image: ${IMAGE_REGISTRY:+${IMAGE_REGISTRY}/}chatlpt/node:406b248
     build:
-      context: https://github.com/NE-Build-Track/node.git#406b248f6cb8728e6e7eba1809901f589060bc6b
+      context: https://github.com/livepeer/node.git#406b248f6cb8728e6e7eba1809901f589060bc6b
       dockerfile: docker/Dockerfile
     user: "0:0"  # dev only: lets the container read bind-mounted secrets regardless of host uid
     network_mode: service:clearinghouse  # Kafka and the webhook listen on this namespace's loopback
@@ -42,9 +42,9 @@ services:
   # builder-core's discovery service (`lpb discovery`, builder-core D43) at the commit the app pins (D2):
   # the static directory in config/orchestrators.txt; the embedded engine reads its GET /discovery.
   discovery:
-    image: ${IMAGE_REGISTRY:+${IMAGE_REGISTRY}/}chatlpt/discovery:985f23d
+    image: ${IMAGE_REGISTRY:+${IMAGE_REGISTRY}/}chatlpt/discovery:2134e29
     build:
-      context: https://github.com/NE-Build-Track/livepeer-builder-core.git#985f23d4da7646b76a99810e94af8019011d2bb2
+      context: https://github.com/NE-Build-Track/livepeer-builder-core.git#2134e29e9fb4d06790c23fea9311945b01e9fb01
       dockerfile: deploy/dev-stack/engine/Dockerfile
       args:
         BUILDKIT_CONTEXT_KEEP_GIT_DIR: "1"  # hatch-vcs derives the version from .git

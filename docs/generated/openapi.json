@@ -1127,9 +1127,19 @@
       },
       "WholesaleCost": {
         "additionalProperties": false,
-        "description": "The network cost of one job, read from the engine each time it is shown, never stored (D29).\n\n``none`` means no attempt was paid: a settled $0. ``pending`` means the engine has not seen the\nusage yet. The amount is present for ``none`` (zero), ``delivered``, ``failed_after_payment`` and\n``uncertain``.",
+        "description": "The network cost of one job, read from the engine each time it is shown, never stored (D29).\n\n``none`` means no attempt was paid: a settled $0. ``pending`` means the engine has not seen the\nusage yet. The amount is present for ``none`` (zero), ``delivered``, ``failed_after_payment`` and\n``uncertain``. For ``delivered`` it is the delivered part only (builder-core ``billable``), and\n``failed`` is what the attempts the reply failed over from cost (builder-core D52), if any.",
         "properties": {
           "amount": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failed": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/Money"

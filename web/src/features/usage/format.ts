@@ -27,7 +27,10 @@ export function describeWholesale(wholesale: WholesaleCost | null | undefined): 
   if (wholesale.status === "pending") return { label: "network pending", pending: true };
   if (wholesale.status === "unknown") return { label: "network unknown", pending: false }; // never $0 (D29)
   const amount = formatMoney(wholesale.amount);
-  if (wholesale.status === "delivered") return { label: `network ${amount}`, pending: false };
+  if (wholesale.status === "delivered") {
+    const failedOver = wholesale.failed ? ` · failed over ${formatMoney(wholesale.failed)}` : "";
+    return { label: `network ${amount}${failedOver}`, pending: false };
+  }
   if (wholesale.status === "uncertain") return { label: `network ${amount} (uncertain)`, pending: false };
   return { label: `network ${amount} (failed after payment)`, pending: false };
 }

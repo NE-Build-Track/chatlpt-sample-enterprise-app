@@ -70,6 +70,7 @@ def test_wholesale_from_maps_none_to_a_settled_zero_and_pending_to_pending() -> 
         job_id=job_id,
         status="observed",
         fees=Fees(fee_eth=Decimal("0.0000001"), fee_usd=Decimal("0.000111"), row_count=2),
+        billable=Fees(fee_eth=Decimal("0.0000001"), fee_usd=Decimal("0.000111"), row_count=2),
         attempts=(AttemptCost(attempt_number=1, cost_class="delivered", fees=Fees()),),
         first_observed_at=now,
         updated_at=now,
@@ -82,6 +83,37 @@ def test_wholesale_from_maps_none_to_a_settled_zero_and_pending_to_pending() -> 
         update={"attempts": (AttemptCost(attempt_number=1, cost_class="uncertain", fees=Fees()),)}
     )
     assert wholesale_from(uncertain).status == "uncertain"
+
+
+def test_a_failed_over_reply_shows_what_was_delivered_and_what_failed_over() -> None:
+    """A reply that failed over (builder-core D52) was charged for both attempts. Its network cost is
+    the delivered part (``billable``); the attempt it failed over from is ``failed``."""
+    now = datetime.now(UTC)
+
+    def usd(amount: str) -> Fees:
+        return Fees(fee_eth=Decimal("0.0000001"), fee_usd=Decimal(amount), row_count=1)
+
+    cost = JobCost(
+        job_id=uuid4(),
+        status="observed",
+        fees=Fees(fee_eth=Decimal("0.0000002"), fee_usd=Decimal("0.0003"), row_count=2),
+        billable=usd("0.0002"),
+        attempts=(
+            AttemptCost(attempt_number=1, cost_class="failed_after_payment", fees=usd("0.0001")),
+            AttemptCost(attempt_number=2, cost_class="delivered", fees=usd("0.0002")),
+        ),
+        first_observed_at=now,
+        updated_at=now,
+    )
+    shown = wholesale_from(cost)
+    assert shown.status == "delivered"
+    assert (shown.amount, shown.failed) == (Money(amount=Decimal("0.0002")), Money(amount=Decimal("0.0001")))
+    failed_only = cost.model_copy(
+        update={"billable": Fees(), "attempts": (cost.attempts[0], cost.attempts[0])}
+    )
+    nothing_delivered = wholesale_from(failed_only)
+    assert nothing_delivered.status == "failed_after_payment"
+    assert (nothing_delivered.amount, nothing_delivered.failed) == (Money(amount=Decimal("0.0003")), None)
 
 
 def _failed_job(kind: str, *, payment_sent: bool, state: str = "failed") -> JobFailed:
@@ -113,6 +145,18 @@ def test_failure_mapping_distinguishes_unavailable_from_failed_after_payment() -
     assert isinstance(error, ReplyFailed) and error.payment_sent and not error.uncertain
     timeout = failure_from(_failed_job("timeout", payment_sent=True, state="uncertain"))
     assert isinstance(timeout, ReplyFailed) and timeout.uncertain
+
+
+def test_a_paid_failure_keeps_its_job_even_when_the_runner_refused() -> None:
+    """A job can fail over and still end refused, or with its payment refused, after paying
+    (builder-core D52). It was charged, so the reply keeps its job and shows the cost; only a
+    failure that paid nothing is "unavailable"."""
+    for kind in ("refused", "payment", "unreachable"):
+        error = failure_from(_failed_job(kind, payment_sent=True))
+        assert isinstance(error, ReplyFailed) and error.payment_sent and error.job_id is not None
+    unknown = failure_from(_failed_job("payment_unknown", payment_sent=False, state="uncertain"))
+    assert isinstance(unknown, ReplyFailed) and unknown.uncertain and unknown.job_id is not None
+    assert isinstance(failure_from(_failed_job("refused", payment_sent=False)), ChatUnavailable)
 
 
 def test_network_totals_split_delivered_from_failed_spend() -> None:
