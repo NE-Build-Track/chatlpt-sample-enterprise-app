@@ -51,11 +51,13 @@ class WholesaleCost(Contract):
 
     ``none`` means no attempt was paid: a settled $0. ``pending`` means the engine has not seen the
     usage yet. The amount is present for ``none`` (zero), ``delivered``, ``failed_after_payment`` and
-    ``uncertain``.
+    ``uncertain``. For ``delivered`` it is the delivered part only (builder-core ``billable``), and
+    ``failed`` is what the attempts the reply failed over from cost (builder-core D52), if any.
     """
 
     status: WholesaleStatus
     amount: Money | None = None
+    failed: Money | None = None
     orchestrator_url: str | None = None
     updated_at: datetime | None = None
 
