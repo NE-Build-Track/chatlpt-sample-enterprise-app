@@ -77,6 +77,10 @@ changes beyond the refactor branch (its `FakeEngine` gaps found here were fixed 
 - 2026-10-24: re-pinned to `629f1ab`, the merge of builder-core PRs #43 and #44: a paid reply's
   wholesale cost reads `pending` until it settles (never $0 between syncs), and a cancelled or
   disconnected reply keeps its charge on the job. ChatLPT code is unchanged.
+- 2026-10-27: re-pinned to `chore/pin-gateway` `5e6683a`, the head of builder-core PR #61 (D52, D53),
+  to run ChatLPT against the engine-owned paid call before that pull request merges. ChatLPT still
+  reads wholesale from `JobCost.fees` (everything the allocation paid). `JobCost.billable` is the
+  delivered attempts only and is not the network book.
 
 ## Decision log
 

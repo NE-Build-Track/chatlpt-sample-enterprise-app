@@ -1,10 +1,13 @@
 # livepeer-builder (embedded)
 
-Pinned to branch **`releases/m3`** of `NE-Build-Track/livepeer-builder-core` at commit `629f1ab`
-(2026-10-24: the merge of PR #44, after PR #43: a paid job's cost never reads `none`, and payment
-evidence is stored when the signer signs, builder-core D42; migration `0005`, applied on start).
-Before that `878e4f4` (2026-10-23: the merge of PR #42, after PR #41, the dependency-injection
-refactor, plan 08; `JourneyApi` renamed `ActorApi` in builder-core decision 14).
+Pinned to branch **`chore/pin-gateway`** of `NE-Build-Track/livepeer-builder-core` at commit `5e6683a`
+(2026-10-27: the head of PR #61, builder-core D52 and D53: the engine owns the paid runner call, a paid
+404, 409 or 503 fails over to another orchestrator, and `JobCost.billable` is the delivered attempts
+only). Before that `releases/m3` at `629f1ab` (2026-10-24: the merge of PR #44, after PR #43: a paid
+job's cost never reads `none`, and payment evidence is stored when the signer signs, builder-core D42;
+migration `0005`, applied on start). Before that `878e4f4` (2026-10-23: the merge of PR #42, after
+PR #41, the dependency-injection refactor, plan 08; `JourneyApi` renamed `ActorApi` in builder-core
+decision 14).
 Before that `releases/m3` at `ad6bba9` (2026-10-21: the merge of PR #28, streaming, and PR #31,
 gateway `3238731` and D41), and before that the
 streaming branch `tasks/m3/mz/stream-support` at `93756ba` (2026-10-21: the PR #28 review fixes, D40), `a89216d` (2026-10-20: the stream
@@ -32,7 +35,8 @@ lifecycle fixes, D34–D39), `973ac57`
 - **Streaming:** `jobs.streaming.stream` opens the paid call and yields bytes; a stream the app stops reading ends `abandoned` and the job `uncertain` (see [streaming design](../design-docs/streaming-through-the-engine.md)). `Runner` now carries `version`, `metadata` and `gpu`.
 - **Stream lifecycle (builder-core D34–D40, from `93756ba`):** the engine records a stream's end in its own task, so a cancelled reply still finishes its job and frees its slot. Deadlines: `timeout_s` from the job's start, `first_byte_timeout_s` (60 s default) to the first chunk, `idle_timeout_s` between chunks (we set it; the engine default is 60 s). `JobStream` supports `async with` and `complete()` (succeeded with the bytes the caller read); a cancelled reader, or `disconnected()`, gets `LPB_STREAM_SETTLE_S` (1 s) for the runner to finish, while closing or dropping the iterator abandons at once (D40). `timeout_s` stops once the runner has finished, and `engine.stop()` waits for final writes. We read every stream to the end in a task the browser connection does not touch, so none of this changes our replies.
 - **Gateway `3238731` (builder-core D41, from `ad6bba9`):** `payment_sent` and the manifests come only from the SDK's `on_payment_session`, which runs after the signer returns a valid payment and before the paid request goes out. A failure while signing records the attempt as not paid (`failed`); any charge the signer made then shows in reconciliation as unattributed. The SDK now verifies runner TLS certificates with the process trust store: a runner with a self-signed certificate is `unreachable`, unpaid, and the engine fails over. A missing payload is sent as `{}`.
-- **Failover only before payment.** After payment the job is bound to a runner; a timeout leaves it `uncertain`.
+- **Paid call owned by the engine (builder-core D52 and D53, from `5e6683a`):** the engine sends the runner request, answers the 402, and stores the manifest before it asks the signer. A validated payment is `payment_sent` before the paid request goes out. An explicit signer refusal fails over and costs nothing. A lost, malformed or 5xx signer reply is `payment_unknown`: the job is `uncertain`, nothing else is paid, and the cost stays `pending` until usage matches the manifest. A paid 404, 409 or 503 fails over to another orchestrator (one payment per orchestrator, bounded by `max_attempts`). A paid 502 or 504, or a timeout, is `uncertain`. `JobCost.fees` is everything the allocation paid, including attempts the job failed over from. `JobCost.billable` is the delivered attempts only. ChatLPT's network book reads `fees` (D29).
+- **Failover only before payment, except a paid refusal.** After a validated payment the job may fail over only when the work did not run (a 404, 409 or 503, or a signer refusal) and only onto a different orchestrator. A timeout leaves it `uncertain`.
 - **`per_application` mode** needs `LPB_SHARED_PAYMENT_KEY` and `LPB_SHARED_ALLOCATION_ID`; jobs still carry `actor_id`.
 - **No operator token.** `LPB_BATTERIES_OPERATOR_TOKEN` only turns on the engine's grant desk
   (`engine.payments.grants`); ChatLPT never lists or creates grants, so it leaves it unset.
