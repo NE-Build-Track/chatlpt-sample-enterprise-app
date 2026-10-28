@@ -77,6 +77,9 @@ changes beyond the refactor branch (its `FakeEngine` gaps found here were fixed 
 - 2026-10-24: re-pinned to `629f1ab`, the merge of builder-core PRs #43 and #44: a paid reply's
   wholesale cost reads `pending` until it settles (never $0 between syncs), and a cancelled or
   disconnected reply keeps its charge on the job. ChatLPT code is unchanged.
+- 2026-10-26: pinned to builder-core `985f23d` (`tasks/mz/discovery-service`, #45): the stack runs
+  builder-core's discovery service, `LPB_DISCOVERY_URL` points at it, the signer only signs, and the
+  embedded engine is built only with both `LPB_SIGNER_URL` and `LPB_DISCOVERY_URL`.
 
 ## Decision log
 

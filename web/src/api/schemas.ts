@@ -29,6 +29,7 @@ export type TokenUsage = z.infer<typeof TokenUsage>;
 export const WholesaleCost = z.object({
   status: z.enum(["none", "pending", "delivered", "failed_after_payment", "uncertain", "unknown"]),
   amount: Money.nullable().optional(),
+  failed: Money.nullable().optional(), // delivered replies: what the attempts it failed over from cost
   orchestrator_url: z.string().nullable().optional(),
   updated_at: z.string().nullable().optional(),
 });

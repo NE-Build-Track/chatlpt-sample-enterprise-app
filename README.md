@@ -75,7 +75,7 @@ Each is a numbered decision in [docs/design-docs/decisions.md](docs/design-docs/
 | Assumption | Decision |
 | --- | --- |
 | Streaming is required, and is designed generically for builder-core, not patched into this app | D1, D20 |
-| builder-core is pinned to `releases/m3` at `ad6bba9`, the merge of the streaming work | D2 |
+| builder-core is pinned to `releases/m3` at `2134e29` (native HTTP, paid failover, the manifest stored before signing) | D2 |
 | One shared application payment key; the app tracks tokens per user; both books are kept | D3 |
 | Retail prices are Alibaba Cloud's international list prices for Qwen3.8-27B, recorded in-repo with a date | D4 |
 | Email/password accounts in SQLite, self-signup open; Google (OIDC) and GitHub (OAuth 2.0) optional | D5, D6 |
@@ -155,16 +155,16 @@ allocation; the amounts are tiny (about $0.00003 for a short reply) but they are
 
 ## Deploy
 
-The compose file runs three services: `clearinghouse` (Batteries with embedded Kafka), `signer`
-(the node remote signer, sharing the clearinghouse network namespace) and `chatlpt`. Only the app is
+The compose file runs four services: `clearinghouse` (Batteries with embedded Kafka), `signer`
+(the node remote signer, sharing the clearinghouse network namespace; it only signs), `discovery`
+(builder-core's discovery service, listing `deploy/config/orchestrators.txt`) and `chatlpt`. Only the app is
 published, on loopback. Put a TLS proxy in front for anything but local use.
 
 ```sh
 cd deploy
 python3 init-secrets.py                      # Batteries creds, engine token, webhook, Kafka users
 # add, mode 0600: secrets/rpc-url, secrets/keystore.json, secrets/keystore-password
-python3 config/pin-orchestrator-certs.py     # pin the approved orchestrators' TLS certificates
-docker compose up -d clearinghouse signer
+docker compose up -d clearinghouse signer discovery
 ./first-run.sh                               # grant + shared allocation key → .env
 docker compose up -d chatlpt
 ```

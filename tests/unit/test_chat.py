@@ -98,6 +98,24 @@ async def test_a_failed_paid_reply_keeps_its_job_and_its_network_cost_counts(
     assert totals.wholesale_failed.amount == Decimal("0.0001") and totals.wholesale.amount == 0
 
 
+async def test_a_conversation_counts_a_failed_over_charge_as_failed_not_delivered(
+    application: Application, store: MemoryStore, backend: ScriptedBackend
+) -> None:
+    """The conversation total adds each reply's failed-over part to the failed spend, as the account
+    totals do from the engine's summary, so the two never disagree."""
+    user = await application.auth.signup(NewUser(email="f@example.com", password="correct horse"))
+    conversation = await application.conversations.create(user)
+    events = await collect(application.chat.start_reply(user, conversation.id, NewMessage(content="hi")))
+    job_id = events[-1].message.job_id  # type: ignore[union-attr]
+    assert job_id is not None
+    backend.costs[job_id] = WholesaleCost(
+        status="delivered", amount=Money(amount=Decimal("0.0002")), failed=Money(amount=Decimal("0.0001"))
+    )
+    shown = await application.network.with_costs(user.id, await store.list_messages(conversation.id))
+    totals = application.network.conversation_totals(await store.conversation_totals(conversation.id), shown)
+    assert (totals.wholesale.amount, totals.wholesale_failed.amount) == (Decimal("0.0002"), Decimal("0.0001"))
+
+
 async def test_unavailable_backend_refuses_before_any_message_is_stored(
     application: Application, store: MemoryStore, backend: ScriptedBackend
 ) -> None:

@@ -244,7 +244,7 @@ class Application:
         except Exception as error:
             checks.append(Check(name="database", ok=False, detail=str(error)))
         chat_available: bool = False
-        reason: str | None = "engine not configured (LPB_SIGNER_URL)"
+        reason: str | None = "engine not configured (LPB_SIGNER_URL and LPB_DISCOVERY_URL)"
         if self.backend is not None:
             chat_available, reason = self.backend.ready()
         checks.append(Check(name="chat", ok=chat_available, detail=reason))

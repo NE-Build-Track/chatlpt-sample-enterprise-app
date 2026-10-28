@@ -1,0 +1,8 @@
+# The approved orchestrators (D8, docs/references/orchestrators.md): builder-core's discovery service
+# probes each one's /discovery. Orchestrators whose TLS certificate the system trust store rejects are
+# left out (the engine could not call them); the app's discovery filter also keeps only these hosts.
+https://orch-us-central.xodeapp.xyz:18935
+https://us-central-metrics.speedybird.xyz:28935
+https://orch-eu-central.open-pool.com:443
+https://hky.eliteencoder.net:8936
+https://ai1.eliteencoder.net:8936
