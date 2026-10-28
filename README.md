@@ -75,7 +75,7 @@ Each is a numbered decision in [docs/design-docs/decisions.md](docs/design-docs/
 | Assumption | Decision |
 | --- | --- |
 | Streaming is required, and is designed generically for builder-core, not patched into this app | D1, D20 |
-| builder-core is pinned to `chore/pin-gateway` at `5e6683a`, the head of PR #61 | D2 |
+| builder-core is pinned to `tasks/mz/intent-before-signing` at `cf19831`, the head of PR #64 | D2 |
 | One shared application payment key; the app tracks tokens per user; both books are kept | D3 |
 | Retail prices are Alibaba Cloud's international list prices for Qwen3.8-27B, recorded in-repo with a date | D4 |
 | Email/password accounts in SQLite, self-signup open; Google (OIDC) and GitHub (OAuth 2.0) optional | D5, D6 |

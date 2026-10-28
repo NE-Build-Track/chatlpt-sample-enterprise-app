@@ -81,6 +81,9 @@ changes beyond the refactor branch (its `FakeEngine` gaps found here were fixed 
   to run ChatLPT against the engine-owned paid call before that pull request merges. ChatLPT still
   reads wholesale from `JobCost.fees` (everything the allocation paid). `JobCost.billable` is the
   delivered attempts only and is not the network book.
+- 2026-10-28: re-pinned to `tasks/mz/intent-before-signing` `cf19831`, the head of builder-core PR #64
+  (D54; PR #61 merged as `ea5013c`), to run ChatLPT against the manifest stored before signing.
+  Migration `0006` adds `payment_state` to `lpb_payment_sessions` on start. ChatLPT code is unchanged.
 
 ## Decision log
 
