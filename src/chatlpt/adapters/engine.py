@@ -54,6 +54,13 @@ PERMISSIONS = frozenset({"discover", "jobs.run", "jobs.read", "costs.read"})
 CHAT_PATH = "/v1/chat/completions"
 MODELS_PATH = "/v1/models"
 _UNAVAILABLE_KINDS = {"no_offering", "no_capacity", "not_provisioned", "refused", "unreachable", "payment"}
+# Why a payment failed (builder-core D58), in the user's words. "signer_unknown" leaves the job
+# uncertain, which the reply already says.
+_PAYMENT_REASONS = {
+    "allowance_exhausted": "ChatLPT's network allowance is used up. An admin needs to fund it.",
+    "not_authorized": "The payment service refused ChatLPT's payment key. An admin needs to check it.",
+    "signer_unavailable": "The payment service is unreachable. Try again shortly.",
+}
 
 
 def actor_for(user_id: UUID) -> ActorContext:
@@ -365,10 +372,11 @@ def failure_from(exc: JobFailed) -> ChatUnavailable | ReplyFailed:
         return ReplyFailed(str(exc), payment_sent=False, job_id=job_id)
     # Unavailable only when nothing was paid: a job can fail over and still end refused after paying
     # (builder-core D52), and its reply keeps the job so the cost shows.
+    reason = _PAYMENT_REASONS.get(failure.reason or "")
     if failure.kind in _UNAVAILABLE_KINDS and not failure.payment_sent:
-        return ChatUnavailable(failure.message)
+        return ChatUnavailable(reason or failure.message)
     uncertain = failure.kind in ("timeout", "abandoned") or exc.job.state == "uncertain"
-    detail = failure.message if not failure.body else f"{failure.message}: {failure.body[:300]}"
+    detail = reason or (failure.message if not failure.body else f"{failure.message}: {failure.body[:300]}")
     return ReplyFailed(detail, payment_sent=failure.payment_sent, uncertain=uncertain, job_id=job_id)
 
 

@@ -116,7 +116,9 @@ def test_a_failed_over_reply_shows_what_was_delivered_and_what_failed_over() -> 
     assert (nothing_delivered.amount, nothing_delivered.failed) == (Money(amount=Decimal("0.0003")), None)
 
 
-def _failed_job(kind: str, *, payment_sent: bool, state: str = "failed") -> JobFailed:
+def _failed_job(
+    kind: str, *, payment_sent: bool, state: str = "failed", reason: str | None = None
+) -> JobFailed:
     now = datetime.now(UTC)
     job = Job(
         id=uuid4(),
@@ -129,7 +131,7 @@ def _failed_job(kind: str, *, payment_sent: bool, state: str = "failed") -> JobF
         model=None,
         state=state,
         attempts=(),  # type: ignore[arg-type]
-        failure=Failure(kind=kind, message=f"{kind} happened", payment_sent=payment_sent),  # type: ignore[arg-type]
+        failure=Failure(kind=kind, message=f"{kind} happened", payment_sent=payment_sent, reason=reason),  # type: ignore[arg-type]
         result=None,
         usage=None,
         created_at=now,
@@ -157,6 +159,24 @@ def test_a_paid_failure_keeps_its_job_even_when_the_runner_refused() -> None:
     unknown = failure_from(_failed_job("payment_unknown", payment_sent=False, state="uncertain"))
     assert isinstance(unknown, ReplyFailed) and unknown.uncertain and unknown.job_id is not None
     assert isinstance(failure_from(_failed_job("refused", payment_sent=False)), ChatUnavailable)
+
+
+def test_a_payment_failure_says_why_in_the_users_words() -> None:
+    """The engine says why a payment failed (builder-core D58); the user reads what it means for
+    ChatLPT and who can fix it, not the engine's words."""
+    spent = failure_from(_failed_job("payment", payment_sent=False, reason="allowance_exhausted"))
+    assert isinstance(spent, ChatUnavailable)
+    assert str(spent) == "ChatLPT's network allowance is used up. An admin needs to fund it."
+    refused = failure_from(_failed_job("payment", payment_sent=False, reason="not_authorized"))
+    assert str(refused) == "The payment service refused ChatLPT's payment key. An admin needs to check it."
+    down = failure_from(_failed_job("payment", payment_sent=False, reason="signer_unavailable"))
+    assert str(down) == "The payment service is unreachable. Try again shortly."
+    # After a paid attempt it failed over from, the reply still fails with its job, in the same words.
+    paid = failure_from(_failed_job("payment", payment_sent=True, reason="allowance_exhausted"))
+    assert isinstance(paid, ReplyFailed) and paid.job_id is not None
+    assert str(paid) == "ChatLPT's network allowance is used up. An admin needs to fund it."
+    # No reason: the engine's words, as before.
+    assert str(failure_from(_failed_job("payment", payment_sent=False))) == "payment happened"
 
 
 def test_network_totals_split_delivered_from_failed_spend() -> None:
