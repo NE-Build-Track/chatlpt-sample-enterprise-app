@@ -3,8 +3,9 @@
 How ChatLPT uses livepeer-builder: the classes on each side of the boundary, and the flows that cross
 it. Every box and message is a real class, method, route or setting in this repository or in
 builder-core, so each diagram leads to the code. The diagrams describe the code pinned to builder-core
-`releases/m3` `2134e29`: the discovery service (builder-core D43), paid failover (D52, D55), the
-engine's own paid call (D53, D54) and `JobCost.billable`.
+`releases/m3` `1514212`: the discovery service (builder-core D43), paid failover (D52, D55), the
+engine's own paid call (D53, D54), `JobCost.billable`, and the M3 repeat rules (D57) and payment failure
+reasons (D58).
 
 This is the consumer's view. The engine's own interfaces and its REST server are drawn in builder-core's
 [interfaces-and-http-servers.md](https://github.com/NE-Build-Track/livepeer-builder-core/blob/tasks/mz/interface-walkthrough/docs/design-docs/interfaces-and-http-servers.md).

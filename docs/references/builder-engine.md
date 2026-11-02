@@ -1,7 +1,14 @@
 # livepeer-builder (embedded)
 
-Pinned to **`releases/m3`** of `NE-Build-Track/livepeer-builder-core` at commit `2134e29`
-(2026-10-28, the merge of PR #55). Since `985f23d` it adds #46's review fixes, paid failover
+Pinned to **`releases/m3`** of `NE-Build-Track/livepeer-builder-core` at commit `1514212`
+(2026-11-02, the merge of PR #77, the last of M3). Since `2134e29` it adds actors and the auditor key
+(#69, D46, D48), repeat-safe commands and job repeat rules (#76, D57), runner discovery records re-served
+as received (#87), payment call timings (#90, `Attempt.timings`), distinct payment failures (#78, D58:
+`Failure.reason`, no signer text in `Failure.body`, a `payment_unknown` job ends `uncertain`), paged job
+history and a request-size limit (#81, D59), cost per app on the summary (#82, D60: `CostSummary.by_app`),
+revoke repeats (#83, D61) and network rates with their source and age (#77). Migrations `0007`–`0011`
+are applied on start. The SDK is still upstream `livepeer/livepeer-python-gateway` `2017a80`.
+Before that `releases/m3` `2134e29` (2026-10-28, the merge of PR #55). Since `985f23d` it adds #46's review fixes, paid failover
 (D52, D55), the engine's own paid runner call (D53), the manifest stored before signing (D54,
 migration `0006`, applied on start), `JobCost.billable` and native HTTP (D56). Builder-core pins the
 SDK to upstream `livepeer/livepeer-python-gateway` `2017a80`.
@@ -41,6 +48,7 @@ lifecycle fixes, D34–D39), `973ac57`
 - **Stream lifecycle (builder-core D34–D40, from `93756ba`):** the engine records a stream's end in its own task, so a cancelled reply still finishes its job and frees its slot. Deadlines: `timeout_s` from the job's start, `first_byte_timeout_s` (60 s default) to the first chunk, `idle_timeout_s` between chunks (we set it; the engine default is 60 s). `JobStream` supports `async with` and `complete()` (succeeded with the bytes the caller read); a cancelled reader, or `disconnected()`, gets `LPB_STREAM_SETTLE_S` (1 s) for the runner to finish, while closing or dropping the iterator abandons at once (D40). `timeout_s` stops once the runner has finished, and `engine.stop()` waits for final writes. We read every stream to the end in a task the browser connection does not touch, so none of this changes our replies.
 - **The engine's own paid call (builder-core D53, D54, from `2134e29`):** the engine answers the 402 and signs through the SDK's signer client; it no longer uses the SDK's `on_payment_session`. It stores each manifest before asking the signer (`unknown`), then `paid` or `unpaid`. A signer that gives no answer leaves the job `uncertain` and its cost `pending` until usage settles it, never `none` at $0. Runner TLS is verified with the process trust store: a runner with a self-signed certificate is `unreachable`, unpaid, and the engine fails over. A missing payload is sent as `{}`.
 - **Failover, also after payment (builder-core D52, D55).** A runner that refuses (503, 404, 409, or a refused payment) fails over, also after payment, but then only to another orchestrator and at most `LPB_MAX_PAID_ATTEMPTS` (2) times. A charge the reply failed over from is `failed_after_payment`; `JobCost.billable` is the delivered part only. A paid timeout or lost connection leaves the job `uncertain`.
+- **Why a payment failed (builder-core D58, from `1514212`).** A `payment` failure carries `Failure.reason`: `allowance_exhausted` (the signer's 402), `not_authorized` (401 or 403), `signer_unavailable` (never reached), or `signer_unknown` on a `payment_unknown` failure, which ends the job `uncertain` because the signer may have charged. `Failure.body` never holds the signer's text. `failure_from` (`adapters/engine.py`) shows the first three in the user's words, saying who can fix it.
 - **`per_application` mode** needs `LPB_SHARED_PAYMENT_KEY` and `LPB_SHARED_ALLOCATION_ID`; jobs still carry `actor_id`.
 - **No operator token.** `LPB_BATTERIES_OPERATOR_TOKEN` only turns on the engine's grant desk
   (`engine.payments.grants`); ChatLPT never lists or creates grants, so it leaves it unset.

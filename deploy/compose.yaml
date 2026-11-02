@@ -42,9 +42,9 @@ services:
   # builder-core's discovery service (`lpb discovery`, builder-core D43) at the commit the app pins (D2):
   # the static directory in config/orchestrators.txt; the embedded engine reads its GET /discovery.
   discovery:
-    image: ${IMAGE_REGISTRY:+${IMAGE_REGISTRY}/}chatlpt/discovery:2134e29
+    image: ${IMAGE_REGISTRY:+${IMAGE_REGISTRY}/}chatlpt/discovery:1514212
     build:
-      context: https://github.com/NE-Build-Track/livepeer-builder-core.git#2134e29e9fb4d06790c23fea9311945b01e9fb01
+      context: https://github.com/NE-Build-Track/livepeer-builder-core.git#15142129ebbf51103658f8ad48fd5adae052c56d
       dockerfile: deploy/dev-stack/engine/Dockerfile
       args:
         BUILDKIT_CONTEXT_KEEP_GIT_DIR: "1"  # hatch-vcs derives the version from .git

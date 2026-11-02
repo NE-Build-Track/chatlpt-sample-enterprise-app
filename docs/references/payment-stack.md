@@ -7,7 +7,7 @@ components themselves), all built from upstream `livepeer/*`:
 | --- | --- | --- |
 | `clearinghouse` | `livepeer/clearinghouse-batteries`, `examples/compose/Dockerfile` | `ca09e47c067682fb48c3f15425546fb6aa5b6659` |
 | `signer` | `livepeer/node`, `docker/Dockerfile`, binary `livepeer-signer` | `406b248f6cb8728e6e7eba1809901f589060bc6b` (v1.0.2) |
-| `discovery` | `NE-Build-Track/livepeer-builder-core`, `deploy/dev-stack/engine/Dockerfile`, `lpb discovery` | the commit ChatLPT pins (D2), `2134e29` |
+| `discovery` | `NE-Build-Track/livepeer-builder-core`, `deploy/dev-stack/engine/Dockerfile`, `lpb discovery` | the commit ChatLPT pins (D2), `1514212` |
 
 ## Topology
 
