@@ -1,7 +1,14 @@
 # livepeer-builder (embedded)
 
-Pinned to **`releases/m3`** of `NE-Build-Track/livepeer-builder-core` at commit `2134e29`
-(2026-10-28, the merge of PR #55). Since `985f23d` it adds #46's review fixes, paid failover
+Pinned to **`releases/m3`** of `NE-Build-Track/livepeer-builder-core` at commit `1514212`
+(2026-11-02, the merge of PR #77, the last of M3). Since `2134e29` it adds actors and the auditor key
+(#69, D46, D48), repeat-safe commands and job repeat rules (#76, D57), runner discovery records re-served
+as received (#87), payment call timings (#90, `Attempt.timings`), distinct payment failures (#78, D58:
+`Failure.reason`, no signer text in `Failure.body`, a `payment_unknown` job ends `uncertain`), paged job
+history and a request-size limit (#81, D59), cost per app on the summary (#82, D60: `CostSummary.by_app`),
+revoke repeats (#83, D61) and network rates with their source and age (#77). Migrations `0007`–`0011`
+are applied on start. The SDK is still upstream `livepeer/livepeer-python-gateway` `2017a80`.
+Before that `releases/m3` `2134e29` (2026-10-28, the merge of PR #55). Since `985f23d` it adds #46's review fixes, paid failover
 (D52, D55), the engine's own paid runner call (D53), the manifest stored before signing (D54,
 migration `0006`, applied on start), `JobCost.billable` and native HTTP (D56). Builder-core pins the
 SDK to upstream `livepeer/livepeer-python-gateway` `2017a80`.
