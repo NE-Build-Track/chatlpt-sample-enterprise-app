@@ -22,9 +22,9 @@ dependencies = [
     "argon2-cffi>=23.1",
     "authlib>=1.3",
     "httpx>=0.27",
-    # D2: releases/m3 at 1514212 (builder-core M3: #69, #76, #77, #78, #81, #82, #83, #87, #90)
-    # (docs/design-docs/decisions.md). Re-pin to a release tag once one is cut.
-    "livepeer-builder @ git+https://github.com/NE-Build-Track/livepeer-builder-core.git@15142129ebbf51103658f8ad48fd5adae052c56d",
+    # D2: tag v0.2.0 at 28ae6a9, the M3 release (builder-core #116 step 1; docs/design-docs/decisions.md).
+    # Pinned by commit, not by tag name, so the lock cannot move if the tag does.
+    "livepeer-builder @ git+https://github.com/NE-Build-Track/livepeer-builder-core.git@28ae6a953ba993eaa2839a97d53ed3f7f6101bca",
 ]
 
 [project.scripts]

@@ -131,9 +131,10 @@ class Application:
         self._stop = asyncio.Event()
 
     @classmethod
-    async def from_settings(cls, settings: Settings, engine_settings: EngineSettings) -> "Application":
+    async def from_settings(cls, settings: Settings, engine_settings: EngineSettings | None) -> "Application":
         """The composition root: ChatLPT's settings and the embedded engine's, both as values.
 
+        ``engine_settings`` is None when there is no ``LPB_DISCOVERY_URL``: the app runs without an engine.
         What opens goes on an exit stack at once, so a failure part-way closes it (the engine is stopped,
         the store closed). On success the application owns both and ``stop()`` releases them.
         """
@@ -144,7 +145,7 @@ class Application:
 
     @classmethod
     async def _build(
-        cls, settings: Settings, engine_settings: EngineSettings, opened: contextlib.AsyncExitStack
+        cls, settings: Settings, engine_settings: EngineSettings | None, opened: contextlib.AsyncExitStack
     ) -> "Application":
         clock = SystemClock()
         store = await SqlStore.connect(settings.database_url, migrate=settings.auto_migrate)
