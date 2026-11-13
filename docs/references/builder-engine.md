@@ -1,7 +1,15 @@
 # livepeer-builder (embedded)
 
-Pinned to **`releases/m3`** of `NE-Build-Track/livepeer-builder-core` at commit `1514212`
-(2026-11-02, the merge of PR #77, the last of M3). Since `2134e29` it adds actors and the auditor key
+Pinned to tag **`v0.2.0`** of `NE-Build-Track/livepeer-builder-core`, commit `28ae6a9` (2026-11-11, the
+M3 release; builder-core #116 step 1). Since `1514212` it reads runners only from livepeer/node's
+`/discovery` document at the required `LPB_DISCOVERY_URL`, and `lpb discovery`, `livepeer_builder.discovery`
+and `StaticDiscoverySource` are gone (#95, #96, D63); `Runner` has no `runner_id`, `rate` or `rate_error`
+and carries `price_info` as advertised. It refuses an id, label or reference over 200 characters or
+holding a NUL (#103), no longer burns a job's `operation_ref` when the signer never signed (#79), and
+fills the cost summary's default window from its own clock (#102). No migration since `0011`; the SDK
+is still `2017a80`. Tag `v0.2.1` exists (a dev-stack Batteries fix, #108); the pin stays on `v0.2.0` as
+#116 says.
+Before that `releases/m3` at `1514212` (2026-11-02, the merge of PR #77, the last of M3). Since `2134e29` it adds actors and the auditor key
 (#69, D46, D48), repeat-safe commands and job repeat rules (#76, D57), runner discovery records re-served
 as received (#87), payment call timings (#90, `Attempt.timings`), distinct payment failures (#78, D58:
 `Failure.reason`, no signer text in `Failure.body`, a `payment_unknown` job ends `uncertain`), paged job
@@ -55,12 +63,22 @@ lifecycle fixes, D34–D39), `973ac57`
 - **Money is `Decimal`.** A cost status of `none` means no attempt was paid: a settled $0 (D29).
 - **One engine process per database.** Fine: one container.
 - **Discovery** refreshes every `LPB_DISCOVERY_INTERVAL_S` (15 s) and is stale after three misses.
+- **Discovery is livepeer/node's contract (builder-core D63, from `v0.2.0`).** `LPB_DISCOVERY_URL` is
+  required: `EngineSettings` does not build without it, so `engine_settings_from_env` returns None and
+  the app runs with chat off, as it does without a signer. The stack points it at livepeer/node's
+  `livepeer-discovery` (`deploy/config/discovery.toml`). The reader skips a runner with no `observed_at`
+  (an orchestrator on node `v1.0.2`), and so does `livepeer-discovery`. `orchestrator_url` is the
+  entry's `address` only when it has the runner URL's origin, else None, and the engine pays only the
+  runner URL's origin; so `FilteredDiscovery` approves a runner by the host of `Runner.url`.
+- **Stored text (builder-core #103, from `v0.2.0`).** `JobRequest.app`, `operation_ref`, `capability`
+  and `model` are at most 200 characters with no NUL, refused when the request is built. Ours are the
+  configured app names and UUIDs.
 
 ## Extension points we use
 
 - **Decorate** `parts.discovery_source` (`FilteredDiscovery`, `adapters/discovery.py`): the engine's configured
-  source (`HttpDiscoverySource` on `LPB_DISCOVERY_URL`), filtered to our apps on D8 hosts; it reads each `Runner.metadata` for the
-  context window (D14).
+  source (`HttpDiscoverySource` on `LPB_DISCOVERY_URL`, the only source since D63), filtered to our apps
+  on D8 hosts by the runner URL's host; it reads each `Runner.metadata` for the context window (D14).
 - `SelectionPolicy`: the default `MostCapacityFirst` for now.
 - Everything else: defaults.
 - **Tests** use `livepeer_builder.testing.FakeEngine` (the journey, scripted with `Reply`, `Fails`, `Raises`),

@@ -3,7 +3,7 @@
 How ChatLPT uses livepeer-builder: the classes on each side of the boundary, and the flows that cross
 it. Every box and message is a real class, method, route or setting in this repository or in
 builder-core, so each diagram leads to the code. The diagrams describe the code pinned to builder-core
-`releases/m3` `1514212`: the discovery service (builder-core D43), paid failover (D52, D55), the
+`v0.2.0` (`28ae6a9`): livepeer/node's discovery contract (builder-core D63), paid failover (D52, D55), the
 engine's own paid call (D53, D54), `JobCost.billable`, and the M3 repeat rules (D57) and payment failure
 reasons (D58).
 
@@ -27,7 +27,7 @@ flowchart LR
         App["ChatLPT: FastAPI, services, chatlpt.db"]
         Eng["BuilderEngine (embedded): livepeer-builder.db"]
     end
-    Disc["discovery (lpb discovery, static list)"]
+    Disc["discovery (livepeer/node livepeer-discovery, static list)"]
     Signer["signer (livepeer-node)"]
     CH["clearinghouse (Batteries)"]
     Orch["Orchestrators: chat and image runners"]
@@ -114,7 +114,8 @@ classDiagram
 ```
 
 Without both `LPB_SIGNER_URL` and `LPB_DISCOVERY_URL`, `build_engine` returns `None`: the app still
-runs, with chat and images reported unavailable in `/readyz`.
+runs, with chat and images reported unavailable in `/readyz`. builder-core requires `LPB_DISCOVERY_URL`
+(D63), so without it `engine_settings_from_env` returns `None` instead of an `EngineSettings`.
 
 ### The engine boundary
 
@@ -327,7 +328,7 @@ sequenceDiagram
     participant FD as FilteredDiscovery
     participant U as uvicorn and lifespan
     Op->>CLI: chatlpt serve
-    CLI->>App: from_settings(Settings, EngineSettings.from_env())
+    CLI->>App: from_settings(Settings, engine_settings_from_env())
     App->>Store: connect(chatlpt.db, migrate)
     App->>BE: build_engine(settings, apps, approved_hosts, clock)
     alt LPB_SIGNER_URL or LPB_DISCOVERY_URL missing
@@ -362,7 +363,7 @@ sequenceDiagram
     participant DS as DiscoveryService (engine)
     participant FD as FilteredDiscovery
     participant H as HttpDiscoverySource (engine)
-    participant Svc as discovery service
+    participant Svc as livepeer-discovery
     participant Ctx as ContextService
     participant Cache as AppStore (model info)
     participant B as ChatBackend
@@ -372,7 +373,7 @@ sequenceDiagram
         H->>Svc: GET /discovery
         Svc-->>H: runners of every orchestrator
         H-->>FD: Runner[]
-        FD->>FD: keep our apps on approved hosts
+        FD->>FD: keep our apps whose runner URL is on an approved host
         FD->>FD: parse runner.metadata, keep the smallest max_context per app
         FD-->>DS: Runner[] (errors propagate: the engine keeps its last snapshot)
     end
