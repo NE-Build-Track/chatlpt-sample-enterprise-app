@@ -1,13 +1,22 @@
 # Payment stack: Clearinghouse Batteries and the node remote signer
 
-Same pins as builder-core's `deploy/dev-stack` (its README is the runbook of record for the
+The components of builder-core's `deploy/dev-stack` (its README is the runbook of record for the
 components themselves), all built from upstream `livepeer/*`:
 
 | Service | Source | Pin |
 | --- | --- | --- |
 | `clearinghouse` | `livepeer/clearinghouse-batteries`, `examples/compose/Dockerfile` | `ca09e47c067682fb48c3f15425546fb6aa5b6659` |
 | `signer` | `livepeer/node`, `docker/Dockerfile`, binary `livepeer-signer` | `406b248f6cb8728e6e7eba1809901f589060bc6b` (v1.0.2) |
-| `discovery` | `NE-Build-Track/livepeer-builder-core`, `deploy/dev-stack/engine/Dockerfile`, `lpb discovery` | the commit ChatLPT pins (D2), `1514212` |
+| `discovery` | `livepeer/node`, `docker/Dockerfile`, binary `livepeer-discovery`, static mode, list in `deploy/config/discovery.toml` | `f45d83fd68f73d195dffe8b45f6cac296d023c49` (main, 10 commits after v1.0.6: the node commit builder-core `v0.2.0` pins, D2) |
+
+The signer stays at `406b248` (D9), while builder-core `v0.2.0`'s own dev stack signs with `f45d83f` too
+(its D63 (5)). The engine reaches the signer through the same SDK pin at both engine commits.
+
+`livepeer-discovery` skips a runner with no `observed_at` and an orchestrator whose TLS certificate the
+system trust store rejects. On 2026-11-13 that left only `ai1.eliteencoder.net` of the five D8 hosts:
+`hky.eliteencoder.net`, the one host advertising `blueclaw/chat/qwen3.8-27b`, serves its runner without
+`observed_at` (node older than `v1.0.4`). Check before a paid run: `docker compose exec chatlpt python -c
+"import urllib.request; print(urllib.request.urlopen('http://discovery:8939/discovery').read().decode())"`.
 
 ## Topology
 

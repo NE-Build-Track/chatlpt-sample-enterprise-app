@@ -1,6 +1,6 @@
-# ChatLPT deployment: the payment stack (Batteries + node remote signer), builder-core's discovery service
-# and the app. See README.md#deploy and docs/references/payment-stack.md. Orchestrators exist on the
-# network; the discovery service lists the ones in config/orchestrators.txt and the signer only signs.
+# ChatLPT deployment: the payment stack (Batteries + node remote signer), livepeer/node's discovery and the
+# app. See README.md#deploy and docs/references/payment-stack.md. Orchestrators exist on the network;
+# discovery collects the ones in config/discovery.toml and the signer only signs.
 # Upstream images are built by scripts/build-images.sh from the pinned commits (D9).
 name: chatlpt
 
@@ -39,26 +39,18 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # builder-core's discovery service (`lpb discovery`, builder-core D43) at the commit the app pins (D2):
-  # the static directory in config/orchestrators.txt; the embedded engine reads its GET /discovery.
+  # livepeer/node's livepeer-discovery in static mode, as builder-core v0.2.0's dev stack runs it (D63): the
+  # node image at the commit builder-core pins (f45d83f; the signer above stays at 406b248), the list in
+  # config/discovery.toml. The embedded engine reads its GET /discovery. No healthcheck: /readyz is on the
+  # container's loopback metrics port, says only that the process runs, and the image has no HTTP client.
   discovery:
-    image: ${IMAGE_REGISTRY:+${IMAGE_REGISTRY}/}chatlpt/discovery:1514212
+    image: ${IMAGE_REGISTRY:+${IMAGE_REGISTRY}/}chatlpt/node:f45d83f
     build:
-      context: https://github.com/NE-Build-Track/livepeer-builder-core.git#15142129ebbf51103658f8ad48fd5adae052c56d
-      dockerfile: deploy/dev-stack/engine/Dockerfile
-      args:
-        BUILDKIT_CONTEXT_KEEP_GIT_DIR: "1"  # hatch-vcs derives the version from .git
-    command: [lpb, discovery]
-    environment:
-      LPD_ORCHESTRATORS: /etc/lpd/orchestrators.txt
-      LPD_HTTP_HOST: 0.0.0.0
-    volumes: [./config/orchestrators.txt:/etc/lpd/orchestrators.txt:ro]
-    healthcheck:
-      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8939/healthz')"]
-      interval: 15s
-      timeout: 3s
-      start_period: 10s
-      retries: 3
+      context: https://github.com/livepeer/node.git#f45d83fd68f73d195dffe8b45f6cac296d023c49
+      dockerfile: docker/Dockerfile
+    entrypoint: ["/usr/local/bin/livepeer-discovery"]
+    command: [--config, /etc/livepeer/discovery.toml]
+    volumes: [./config/discovery.toml:/etc/livepeer/discovery.toml:ro]
     read_only: true
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
@@ -81,7 +73,7 @@ services:
       CHATLPT_IMAGE_PRICING_FILE: /app/config/pricing/fal-flux-schnell.json
       LPB_DATABASE_URL: sqlite+aiosqlite:////data/livepeer-builder.db
       LPB_HTTP_HOST: 127.0.0.1
-      LPB_DISCOVERY_URL: http://discovery:8939/discovery  # runners; the signer only signs (builder-core D43)
+      LPB_DISCOVERY_URL: http://discovery:8939/discovery  # required (builder-core D63); the signer only signs
     ports: ["127.0.0.1:${CHATLPT_PORT:-3050}:3050"]
     volumes: [chatlpt-data:/data]
     depends_on: [signer, discovery]

@@ -8,8 +8,8 @@ MaxHourlyPrice = "100"
 MaxFixedPrice = "1"
 AuthWebhookFile = "/run/secrets/webhook-url"
 AuthWebhookHeadersFile = "/run/secrets/webhook-headers"
-# The signer only signs payments. The approved orchestrators are the discovery service's static
-# directory, config/orchestrators.txt (D8; builder-core D43); a list here was never a payment control.
+# The signer only signs payments. The approved orchestrators are livepeer-discovery's Nodes in
+# config/discovery.toml (D8; builder-core D63); a list here was never a payment control.
 
 [Kafka]
 Broker = "kafka://127.0.0.1:9092"

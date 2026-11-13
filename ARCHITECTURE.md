@@ -92,9 +92,9 @@ Each third-party package is confined to one module (enforced by `tests/structure
 - Payment runs in `per_application` mode: one shared `lpg_` allocation key for the whole app.
   Jobs still record the actor, so wholesale cost is attributable per user.
 - The engine's discovery source is decorated: `FilteredDiscovery` wraps the engine's own source (which
-  reads builder-core's discovery service at `LPB_DISCOVERY_URL`), keeps runners advertising our apps on
-  the approved orchestrators, and remembers each runner's `metadata` (`model_id`, `max_context`) for the
-  context window.
+  reads livepeer/node's `livepeer-discovery` at `LPB_DISCOVERY_URL`, builder-core D63), keeps runners
+  advertising our apps whose URL is on an approved orchestrator's host, and remembers each runner's
+  `metadata` (`model_id`, `max_context`) for the context window.
 - A reply is `jobs.stream` (D2, plan-06): SSE bytes as the runner produces them. Before 19 October it
   was `jobs.run` in immediate mode (one buffered body); only `adapters/engine.py` changed.
 
