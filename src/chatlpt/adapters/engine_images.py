@@ -192,13 +192,8 @@ class EngineOpenAIImages:
             app=self.app,
             path=OPENAI_IMAGES_PATH,
             method="POST",
-            payload={
-                "model": model,
-                "prompt": prompt,
-                "n": 1,
-                "size": f"{width}x{height}",
-                "response_format": "b64_json",
-            },
+            # ``response_format`` is left out: b64_json is the profile's only value and its default.
+            payload={"model": model, "prompt": prompt, "n": 1, "size": f"{width}x{height}"},
             operation_ref=operation_ref,
             max_attempts=self._max_attempts,
             timeout_s=120,

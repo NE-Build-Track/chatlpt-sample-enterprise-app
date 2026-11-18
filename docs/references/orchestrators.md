@@ -25,3 +25,8 @@ It offers `text-to-image` (FLUX.2 [klein] 4B, profile `openai.images.v1`), which
 `CHATLPT_IMAGE_API=openai` (D30), and no chat app. The chat model was on the network as app `chat` on
 `https://livepeer-ai.xodeapp.xyz:38935`, which is not on the approved list; a paid reply through it
 worked in a test run with that host added and `CHATLPT_CHAT_APP=chat` set for the run only.
+
+The same day an image drawn through `text-to-image` on `ai1` worked end to end (512×512 PNG, 17.8 s for
+the whole reply, $0.02 wholesale). Its runner answers 400 `Unsupported or invalid input` to a request
+that names `response_format`, though the profile lists `b64_json` as an allowed value, and the refused
+request is still charged. The app therefore leaves that field out.

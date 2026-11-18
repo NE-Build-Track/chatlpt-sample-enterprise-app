@@ -139,12 +139,13 @@ async def test_openai_images_asks_in_the_profile_s_words_and_reads_the_png() -> 
     result = await images.generate(UUID(int=1), "a fox", "portrait_4_3", operation_ref="img-1")
     request: JobRequest = engine.jobs.requests[0][1]
     assert (request.app, request.path, request.method) == (OPENAI_APP, OPENAI_PATH, "POST")
-    assert request.payload == {  # the profile allows no other field
+    # Only what is needed: the profile allows no unknown field, and ai1's runner answered 400 to a request
+    # that also named the default ``response_format`` (18 November 2026).
+    assert request.payload == {
         "model": FLUX2,  # the name the runner's own envelope gives
         "prompt": "a fox",
         "n": 1,
         "size": "768x1024",
-        "response_format": "b64_json",
     }
     assert request.operation_ref == "img-1"
     assert result.data == png(768, 1024) and result.url == ""  # the bytes are in the answer
