@@ -145,7 +145,7 @@ async def test_openai_images_asks_in_the_profile_s_words_and_reads_the_png() -> 
         "model": FLUX2,  # the name the runner's own envelope gives
         "prompt": "a fox",
         "n": 1,
-        "size": "768x1024",
+        "size": "512x512",
     }
     assert request.operation_ref == "img-1"
     assert result.data == png(768, 1024) and result.url == ""  # the bytes are in the answer
@@ -155,21 +155,18 @@ async def test_openai_images_asks_in_the_profile_s_words_and_reads_the_png() -> 
 
 
 @pytest.mark.parametrize(
-    ("preset", "size"),
-    [
-        ("square_hd", "1024x1024"),
-        ("square", "512x512"),
-        ("portrait_4_3", "768x1024"),
-        ("portrait_16_9", "576x1024"),
-        ("landscape_4_3", "1024x768"),
-        ("landscape_16_9", "1024x576"),
-    ],
+    "preset",
+    ["square_hd", "square", "portrait_4_3", "portrait_16_9", "landscape_4_3", "landscape_16_9", "?"],
 )
-async def test_openai_images_sends_each_preset_as_the_pixels_fal_gave_it(preset: str, size: str) -> None:
-    engine = openai_engine(answer(png(64, 64)))
-    await EngineOpenAIImages(engine, app=OPENAI_APP).generate(UUID(int=1), "p", preset, operation_ref="a")
+async def test_openai_images_sends_every_preset_as_the_one_size_the_runner_takes(preset: str) -> None:
+    """On 18 November 2026 ai1's runner drew 512x512 and answered 400, and charged, for 1024x768."""
+    engine = openai_engine(answer(png(512, 512)))
+    result = await EngineOpenAIImages(engine, app=OPENAI_APP).generate(
+        UUID(int=1), "p", preset, operation_ref="a"
+    )
     payload = engine.jobs.requests[0][1].payload
-    assert payload is not None and payload["size"] == size
+    assert payload is not None and payload["size"] == "512x512"
+    assert (result.width, result.height) == (512, 512)  # what was drawn, so retail is for that
 
 
 @pytest.mark.parametrize(

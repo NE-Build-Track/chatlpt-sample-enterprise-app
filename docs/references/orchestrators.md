@@ -30,3 +30,9 @@ The same day an image drawn through `text-to-image` on `ai1` worked end to end (
 the whole reply, $0.02 wholesale). Its runner answers 400 `Unsupported or invalid input` to a request
 that names `response_format`, though the profile lists `b64_json` as an allowed value, and the refused
 request is still charged. The app therefore leaves that field out.
+
+It also refused `size: 1024x768` (the console's funded journey, 14:27 UTC), a size it drew on
+9 November and that the profile allows. `512x512` worked three times. The app therefore sends
+`512x512` for every preset of the image tool; the picture is square whatever shape the model asked
+for, and retail is charged for what was drawn. What else the runner accepts is not known: each try,
+refused or not, costs $0.02.

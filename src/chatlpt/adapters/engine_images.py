@@ -101,17 +101,12 @@ async def _run(
 # -- the openai.images.v1 profile (D30) ----------------------------------------------------------------
 
 OPENAI_IMAGES_PATH = "/v1/images/generations"
-# The tool's presets in pixels, as fal defines them (docs/references/fal-pricing.md). The profile takes
-# WIDTHxHEIGHT, each side 256 to 2048; FLUX rounds a side down to a multiple of 16, and these all are.
-PIXELS = {
-    "square_hd": (1024, 1024),
-    "square": (512, 512),
-    "portrait_4_3": (768, 1024),
-    "portrait_16_9": (576, 1024),
-    "landscape_4_3": (1024, 768),
-    "landscape_16_9": (1024, 576),
-}
-_DEFAULT_PIXELS = PIXELS["landscape_4_3"]
+# One size for every preset. The profile takes WIDTHxHEIGHT, each side 256 to 2048, but on 18 November
+# 2026 the one runner that offers it (text-to-image on ai1) drew 512x512 and answered 400 to 1024x768,
+# and a refused request is still charged. Until that runner takes the tool's other shapes, a preset
+# only names the picture the model wanted; the answer's PNG says what was drawn (docs/references/
+# orchestrators.md).
+_SIZE = "512x512"
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 _MAX_BYTES = 25 * 1024 * 1024  # the limit adapters/images.py puts on a fetched image
 
@@ -187,13 +182,12 @@ class EngineOpenAIImages:
         model = self._model()
         if model is None:  # the profile requires it; asking without it would pay for a refusal
             raise ChatUnavailable(f"no runner for {self.app} names its model")
-        width, height = PIXELS.get(image_size, _DEFAULT_PIXELS)
         request = JobRequest(
             app=self.app,
             path=OPENAI_IMAGES_PATH,
             method="POST",
             # ``response_format`` is left out: b64_json is the profile's only value and its default.
-            payload={"model": model, "prompt": prompt, "n": 1, "size": f"{width}x{height}"},
+            payload={"model": model, "prompt": prompt, "n": 1, "size": _SIZE},
             operation_ref=operation_ref,
             max_attempts=self._max_attempts,
             timeout_s=120,

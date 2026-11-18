@@ -24,8 +24,8 @@ for FLUX.1 [schnell]. The machine-readable copy is
 the model is a different product at $0.009 per megapixel; the runner on `ai1` names
 `black-forest-labs/FLUX.2-klein-4B`, the distilled model.
 
-The runner draws the tool's presets at the same pixel sizes as the table above, so a default-size image
-is $0.005 retail and `square_hd` is $0.010.
+The app asks this runner for 512×512 whatever the preset ([orchestrators.md](orchestrators.md)), so
+every image is one billed megapixel: $0.005 retail.
 
 The network's wholesale price for `text-to-image` on ai1.eliteencoder.net was a fixed
 11,125,095,244,150 wei per run, about **$0.02**, on 2026-11-18. An image there costs the operator more
