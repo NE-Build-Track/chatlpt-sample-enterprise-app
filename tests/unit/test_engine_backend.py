@@ -130,9 +130,14 @@ async def test_report_usage_reaches_the_engine_and_maps_its_errors() -> None:
     assert engine.jobs.usage_reports == [
         (reply.job_id, {"prompt_tokens": 1, "completion_tokens": 2, "reasoning_tokens": 1})
     ]
+    other = TokenUsage(prompt_tokens=9, completion_tokens=9)
+    with pytest.raises(ChatUnavailable, match="already reported"):  # a job's usage is stored once
+        await chat.report_usage(UUID(int=1), reply.job_id, other)
+    fresh = await chat.open_reply(UUID(int=1), HI, PARAMS, operation_ref="op-2")
+    assert fresh.job_id is not None
     negative = TokenUsage(prompt_tokens=0, completion_tokens=0).model_copy(update={"prompt_tokens": -1})
-    with pytest.raises(ChatUnavailable):  # the engine refuses negative quantities
-        await chat.report_usage(UUID(int=1), reply.job_id, negative)
+    with pytest.raises(ChatUnavailable, match="non-negative"):  # the engine refuses negative quantities
+        await chat.report_usage(UUID(int=1), fresh.job_id, negative)
     with pytest.raises(ChatUnavailable):  # and a job it does not know
         await chat.report_usage(UUID(int=1), uuid4(), TokenUsage(prompt_tokens=1, completion_tokens=1))
 
