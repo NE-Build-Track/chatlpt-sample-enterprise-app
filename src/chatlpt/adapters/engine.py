@@ -259,7 +259,8 @@ class StreamingReply:
         return self._iterate()
 
     async def _iterate(self) -> AsyncIterator[ReplyChunk]:
-        if not self._stream.content_type.startswith("text/event-stream"):
+        # The engine hands the runner's Content-Type on unchanged, parameters and case included.
+        if self._stream.content_type.partition(";")[0].strip().lower() != "text/event-stream":
             # The runner answered with one body (no stream support, or an error document): parse it whole.
             body = b"".join([chunk async for chunk in self._stream])
             try:

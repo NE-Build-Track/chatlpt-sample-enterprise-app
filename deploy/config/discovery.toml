@@ -1,0 +1,17 @@
+# livepeer/node's livepeer-discovery in static mode (builder-core D63), shaped like builder-core v0.2.0's
+# deploy/dev-stack/config/discovery.toml. Nodes are the approved orchestrators (D8,
+# docs/references/orchestrators.md); the app's discovery filter also keeps only these hosts.
+# It GETs each node's /discovery at start and every RefreshInterval and verifies TLS with the system trust
+# store, so a self-signed orchestrator listed here never appears. It skips a runner with no observed_at,
+# so an orchestrator on livepeer/node v1.0.2 does not appear either. A listener off loopback needs the
+# unsafe@ prefix; /healthz, /readyz and /metrics stay on the container's loopback.
+Listen = "unsafe@0.0.0.0:8939"
+MetricsListen = "127.0.0.1:8940"
+Nodes = [
+  "https://orch-us-central.xodeapp.xyz:18935",
+  "https://us-central-metrics.speedybird.xyz:28935",
+  "https://orch-eu-central.open-pool.com:443",
+  "https://hky.eliteencoder.net:8936",
+  "https://ai1.eliteencoder.net:8936",
+]
+RefreshInterval = "30s"

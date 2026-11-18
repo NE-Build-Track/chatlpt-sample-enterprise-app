@@ -88,6 +88,18 @@ async def test_streaming_reply_yields_deltas_then_usage_and_done() -> None:
     assert sent.payload["stream_options"] == {"include_usage": True} and sent.idle_timeout_s == 45
 
 
+@pytest.mark.parametrize(
+    "content_type",
+    ["text/event-stream; charset=utf-8", "Text/Event-Stream; charset=utf-8", "TEXT/EVENT-STREAM"],
+)
+async def test_an_event_stream_is_read_whatever_its_parameters_and_case(content_type: str) -> None:
+    """The engine hands the runner's Content-Type on unchanged (builder-core #113, C27)."""
+    engine = streaming_engine(sse(delta(content="Hello")), b"data: [DONE]\n\n", content_type=content_type)
+    reply = await backend(engine).open_reply(USER, HI, PARAMS, operation_ref="op")
+    kinds = [(c.kind, c.text) async for c in reply]
+    assert kinds[0] == ("content", "Hello") and kinds[-1][0] == "done"
+
+
 async def test_streaming_reply_falls_back_to_a_whole_json_body() -> None:
     body = json.dumps(
         {

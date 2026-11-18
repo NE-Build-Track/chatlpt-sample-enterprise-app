@@ -70,6 +70,9 @@ class Settings(Contract):
 
     # images (D25): the assistant draws through a tool call; the app runs the image app and keeps the file
     image_app: str = "comfystream/fal-flux-schnell"
+    # The format the image app speaks (D30): "fal" is the fal FLUX app; "openai" is a runner with the
+    # openai.images.v1 profile, such as the app text-to-image.
+    image_api: Literal["fal", "openai"] = "fal"
     tools_enabled: bool = True
     images_dir: str = "./.local/images"
     image_retention_days: int = Field(default=30, ge=1)

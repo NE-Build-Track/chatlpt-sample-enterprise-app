@@ -75,7 +75,7 @@ Each is a numbered decision in [docs/design-docs/decisions.md](docs/design-docs/
 | Assumption | Decision |
 | --- | --- |
 | Streaming is required, and is designed generically for builder-core, not patched into this app | D1, D20 |
-| builder-core is pinned to `releases/m3` at `1514212` (the M3 merge: repeat-safe commands, distinct payment failures, paged job history) | D2 |
+| builder-core is pinned to tag `v0.2.0` at `28ae6a9` (the M3 release: livepeer/node's discovery contract, repeat-safe commands, distinct payment failures, paged job history) | D2 |
 | One shared application payment key; the app tracks tokens per user; both books are kept | D3 |
 | Retail prices are Alibaba Cloud's international list prices for Qwen3.8-27B, recorded in-repo with a date | D4 |
 | Email/password accounts in SQLite, self-signup open; Google (OIDC) and GitHub (OAuth 2.0) optional | D5, D6 |
@@ -157,7 +157,8 @@ allocation; the amounts are tiny (about $0.00003 for a short reply) but they are
 
 The compose file runs four services: `clearinghouse` (Batteries with embedded Kafka), `signer`
 (the node remote signer, sharing the clearinghouse network namespace; it only signs), `discovery`
-(builder-core's discovery service, listing `deploy/config/orchestrators.txt`) and `chatlpt`. Only the app is
+(livepeer/node's `livepeer-discovery`, collecting the orchestrators in `deploy/config/discovery.toml`) and
+`chatlpt`. Only the app is
 published, on loopback. Put a TLS proxy in front for anything but local use.
 
 ```sh
@@ -188,14 +189,14 @@ Everything is an environment variable; `deploy/.env.example` lists each with its
 | `CHATLPT_GOOGLE_CLIENT_ID/SECRET`, `CHATLPT_GITHUB_CLIENT_ID/SECRET` | Enable each sign-in button |
 | `CHATLPT_SYSTEM_PROMPT`, `CHATLPT_TEMPERATURE`, `CHATLPT_MAX_OUTPUT_TOKENS` | Model defaults; the output limit covers answer plus thinking |
 | `CHATLPT_DEFAULT_THINKING`, `CHATLPT_THINKING_BUDGET_LOW/MEDIUM/HIGH` | The per-conversation thinking level and its chain-of-thought caps |
-| `CHATLPT_TOOLS_ENABLED`, `CHATLPT_IMAGE_APP`, `CHATLPT_IMAGES_DIR`, `CHATLPT_IMAGE_RETENTION_DAYS`, `CHATLPT_IMAGE_PRICING_FILE` | Model-driven images: the tool, the runner app, where files live, how long, and fal's price table |
+| `CHATLPT_TOOLS_ENABLED`, `CHATLPT_IMAGE_APP`, `CHATLPT_IMAGE_API`, `CHATLPT_IMAGES_DIR`, `CHATLPT_IMAGE_RETENTION_DAYS`, `CHATLPT_IMAGE_PRICING_FILE` | Model-driven images: the tool, the runner app, the format it speaks (`fal`, or `openai` for the `openai.images.v1` profile, D30), where files live, how long, and the vendor's price table |
 | `CHATLPT_CONTEXT_WINDOW_OVERRIDE` | Last-resort override of the derived context window |
 | `CHATLPT_PRICING_FILE` | The retail price table (`config/pricing/qwen3.8-27b.json`) |
 | `LPB_*` | The embedded engine: signer, Batteries, shared key, database. See [payment-stack](docs/references/payment-stack.md) |
 
 ## Streaming
 
-Replies stream token by token through the engine's `jobs.stream`, from builder-core `releases/m3`
+Replies stream token by token through the engine's `jobs.stream`, from builder-core `v0.2.0`
 (the generic design is in
 [docs/design-docs/streaming-through-the-engine.md](docs/design-docs/streaming-through-the-engine.md)).
 The buffered adapter remains for an engine without `jobs.stream`; it still needs an engine that accepts

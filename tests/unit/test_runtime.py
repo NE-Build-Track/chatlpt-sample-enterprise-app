@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 from livepeer_builder import ActorApi, EngineSettings
 from livepeer_builder.testing import FakeEngine
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 
 from chatlpt.config import Settings
 from chatlpt.runtime import Application, package_version
@@ -28,21 +28,43 @@ def engine_settings(tmp_path: Path, **values: object) -> EngineSettings:
     )
 
 
-@pytest.mark.parametrize(
-    "values",
-    [{}, {"signer_url": SIGNER}, {"discovery_url": DISCOVERY}],
-    ids=["neither", "signer only", "discovery only"],
-)
-async def test_build_engine_is_none_without_a_signer_and_a_discovery_url(
-    tmp_path: Path, values: dict[str, str]
-) -> None:  # the signer pays and the discovery service lists runners (builder-core D43); chat needs both
+async def test_build_engine_is_none_without_engine_settings() -> None:
+    """No LPB_DISCOVERY_URL means no EngineSettings at all (builder-core D63 requires the URL), signer or not."""
+    built = await build_engine(None, apps=frozenset({"a"}), approved_hosts=frozenset(), clock=FixedClock())
+    assert built is None
+
+
+async def test_build_engine_is_none_without_a_signer(tmp_path: Path) -> None:
+    # the signer pays and livepeer/node's discovery lists runners (builder-core D63); chat needs both
     built = await build_engine(
-        engine_settings(tmp_path, **values),
+        engine_settings(tmp_path, discovery_url=DISCOVERY),
         apps=frozenset({"a"}),
         approved_hosts=frozenset(),
         clock=FixedClock(),
     )
     assert built is None
+
+
+def test_engine_settings_from_env_is_none_only_when_the_discovery_url_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from chatlpt.runtime.engine import engine_settings_from_env
+
+    for name in ("LPB_DISCOVERY_URL", "LPB_SIGNER_URL", "LPB_DISCOVERY_INTERVAL_S"):
+        monkeypatch.delenv(name, raising=False)
+    assert engine_settings_from_env() is None
+    monkeypatch.setenv("LPB_DISCOVERY_URL", "")  # empty is unset, as EngineSettings.from_env reads it
+    assert engine_settings_from_env() is None
+    monkeypatch.setenv("LPB_DISCOVERY_INTERVAL_S", "0")  # another invalid setting is never hidden
+    with pytest.raises(ValidationError):
+        engine_settings_from_env()
+    monkeypatch.delenv("LPB_DISCOVERY_INTERVAL_S")
+    monkeypatch.setenv("LPB_DISCOVERY_URL", "discovery:8939")  # a bad URL is an error, not "not configured"
+    with pytest.raises(ValidationError):
+        engine_settings_from_env()
+    monkeypatch.setenv("LPB_DISCOVERY_URL", DISCOVERY)
+    settings = engine_settings_from_env()
+    assert settings is not None and settings.discovery_url == DISCOVERY
 
 
 async def test_build_engine_with_a_signer_and_discovery_wires_the_filtered_discovery(tmp_path: Path) -> None:
@@ -68,7 +90,7 @@ async def test_from_settings_boots_without_an_engine_and_configures_providers(tm
         github_client_id="h",
         github_client_secret=SecretStr("hs"),
     )
-    app = await Application.from_settings(settings, engine_settings(tmp_path))
+    app = await Application.from_settings(settings, None)  # no LPB_DISCOVERY_URL: no engine settings
     try:
         assert set(app.oauth) == {"google", "github"} and app.backend is None
         await app.start()

@@ -1,11 +1,14 @@
 """ChatLPT's discovery filter, a decorator over the engine's configured source (D8, D14).
 
-The engine builds its default ``DiscoverySource`` from ``LPB_DISCOVERY_URL``: builder-core's discovery
-service, which lists orchestrators and serves their runners (the signer only signs, builder-core D43).
-This wraps that source: only our apps on approved
-orchestrators reach the engine (D8), and each runner's ``metadata`` is read as the model's own
-statement of its context window (D14), kept for ``ContextService``. The BlueClaw chat runner publishes
-``{"model_id": ..., "max_context": ...}`` there.
+The engine builds its default ``DiscoverySource`` from ``LPB_DISCOVERY_URL``: livepeer/node's
+``livepeer-discovery``, which collects the listed orchestrators' runners (builder-core D63; the signer
+only signs). This wraps that source: only our apps on approved orchestrators reach the engine (D8), and
+each runner's ``metadata`` is read as the model's own statement of its context window (D14), kept for
+``ContextService``. The BlueClaw chat runner publishes ``{"model_id": ..., "max_context": ...}`` there.
+
+A runner is approved by the host of its ``url``, the host the engine calls. Since D63 the engine sets
+``orchestrator_url`` only when the entry's ``address`` has the same origin as that URL, and otherwise
+leaves it None and pays the URL's host, so the URL's host is also the one paid.
 """
 
 import json
@@ -35,7 +38,7 @@ class FilteredDiscovery:
         """The inner source's runners for our apps on approved hosts. Its errors propagate: the engine
         keeps its last good snapshot and reports the error in health."""
         ours = [runner for runner in await self._inner.fetch() if runner.app in self._apps]
-        kept = [runner for runner in ours if self._host_ok(runner.orchestrator_url)]
+        kept = [runner for runner in ours if self._host_ok(runner.url)]
         advertised: dict[str, list[ModelInfo]] = {}
         for runner in kept:
             info = self._parse(runner.app, runner.metadata)
@@ -54,10 +57,10 @@ class FilteredDiscovery:
     def model_from_discovery(self, app: str) -> ModelInfo | None:
         return self._models.get(app)
 
-    def _host_ok(self, url: str | None) -> bool:
+    def _host_ok(self, url: str) -> bool:
         if not self._hosts:
             return True
-        host = urlparse(url).hostname if url else None
+        host = urlparse(url).hostname
         return host is not None and host.lower() in self._hosts
 
     def _parse(self, app: str, metadata: str | None) -> ModelInfo | None:

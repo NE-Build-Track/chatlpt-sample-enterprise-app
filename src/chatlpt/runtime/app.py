@@ -131,9 +131,10 @@ class Application:
         self._stop = asyncio.Event()
 
     @classmethod
-    async def from_settings(cls, settings: Settings, engine_settings: EngineSettings) -> "Application":
+    async def from_settings(cls, settings: Settings, engine_settings: EngineSettings | None) -> "Application":
         """The composition root: ChatLPT's settings and the embedded engine's, both as values.
 
+        ``engine_settings`` is None when there is no ``LPB_DISCOVERY_URL``: the app runs without an engine.
         What opens goes on an exit stack at once, so a failure part-way closes it (the engine is stopped,
         the store closed). On success the application owns both and ``stop()`` releases them.
         """
@@ -144,7 +145,7 @@ class Application:
 
     @classmethod
     async def _build(
-        cls, settings: Settings, engine_settings: EngineSettings, opened: contextlib.AsyncExitStack
+        cls, settings: Settings, engine_settings: EngineSettings | None, opened: contextlib.AsyncExitStack
     ) -> "Application":
         clock = SystemClock()
         store = await SqlStore.connect(settings.database_url, migrate=settings.auto_migrate)
@@ -161,11 +162,12 @@ class Application:
         image_backend: ImageBackend | None = None
         if built is not None:
             from chatlpt.adapters.engine import BufferedEngineChat, StreamingEngineChat
-            from chatlpt.adapters.engine_images import EngineImages
+            from chatlpt.adapters.engine_images import EngineImages, EngineOpenAIImages
 
             engine, metadata = built
             if settings.tools_enabled:
-                image_backend = EngineImages(engine, app=settings.image_app)
+                images = EngineOpenAIImages if settings.image_api == "openai" else EngineImages
+                image_backend = images(engine, app=settings.image_app)
             adapter = StreamingEngineChat if engine.jobs.streaming is not None else BufferedEngineChat
             backend = adapter(
                 engine, clock, app=settings.chat_app, idle_timeout_s=settings.reply_idle_timeout_s

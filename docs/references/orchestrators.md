@@ -8,8 +8,31 @@
 | `https://hky.eliteencoder.net:8936` | **yes: carries chat since the SDK pin `76a1a1c` enforced TLS (22 October)** | trusted |
 | `https://ai1.eliteencoder.net:8936` | no chat app; **77 runners, 73 of them fal apps, including `comfystream/fal-flux-schnell` at a fixed ~$0.003 per image** (added 2026-10-19 for model-driven images) | trusted |
 
-builder-core's discovery service lists them (`deploy/config/orchestrators.txt`, the static directory)
-and the app's discovery wrapper refuses any runner not on `CHATLPT_APPROVED_ORCHESTRATORS`. The signer
-only signs (builder-core D43). The engine calls runners over verified TLS, so orchestrators whose
-certificate the system trust store rejects cannot be used, and the discovery service leaves them out;
-nothing is pinned (T3 closed).
+livepeer/node's `livepeer-discovery` collects them (`Nodes` in `deploy/config/discovery.toml`,
+builder-core D63) and the app's discovery wrapper refuses any runner whose URL's host is not on
+`CHATLPT_APPROVED_ORCHESTRATORS`. The signer only signs. The engine calls runners over verified TLS, so
+orchestrators whose certificate the system trust store rejects cannot be used, and `livepeer-discovery`
+leaves them out; nothing is pinned (T3 closed). It also leaves out a runner with no `observed_at`, and
+so does the engine's reader.
+
+**2026-11-13**, `livepeer-discovery --dump` built from node `f45d83f` over this list: only `ai1` answered
+(20 runners, no `comfystream/fal-flux-schnell`). `hky` serves `blueclaw/chat/qwen3.8-27b` without
+`observed_at`, so its runner is skipped; `speedybird` and `open-pool` failed TLS; `orch-us-central`
+timed out. No approved host then offered the chat app to builder-core `v0.2.0`.
+
+**2026-11-18**, the same dump from node `eee09c4` (v1.0.7): again only `ai1` answered, with 20 runners.
+It offers `text-to-image` (FLUX.2 [klein] 4B, profile `openai.images.v1`), which the app can use with
+`CHATLPT_IMAGE_API=openai` (D30), and no chat app. The chat model was on the network as app `chat` on
+`https://livepeer-ai.xodeapp.xyz:38935`, which is not on the approved list; a paid reply through it
+worked in a test run with that host added and `CHATLPT_CHAT_APP=chat` set for the run only.
+
+The same day an image drawn through `text-to-image` on `ai1` worked end to end (512×512 PNG, 17.8 s for
+the whole reply, $0.02 wholesale). Its runner answers 400 `Unsupported or invalid input` to a request
+that names `response_format`, though the profile lists `b64_json` as an allowed value, and the refused
+request is still charged. The app therefore leaves that field out.
+
+It also refused `size: 1024x768` (the console's funded journey, 14:27 UTC), a size it drew on
+9 November and that the profile allows. `512x512` worked three times. The app therefore sends
+`512x512` for every preset of the image tool; the picture is square whatever shape the model asked
+for, and retail is charged for what was drawn. What else the runner accepts is not known: each try,
+refused or not, costs $0.02.

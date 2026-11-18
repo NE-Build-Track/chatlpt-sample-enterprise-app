@@ -73,7 +73,7 @@ class ImageService:
         size = image_size if image_size in SIZES else DEFAULT_SIZE
         image_id = new_id()
         result = await self._backend.generate(user.id, prompt, size, operation_ref=str(image_id))
-        data = await self._files.fetch(result.url)
+        data = result.data if result.data is not None else await self._files.fetch(result.url)
         relative = self._files.save(image_id, result.content_type, data)
         now = self._clock.now()
         retail = self.retail(result.width, result.height)
