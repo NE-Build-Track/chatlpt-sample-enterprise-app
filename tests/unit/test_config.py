@@ -4,6 +4,7 @@ import logging
 from decimal import Decimal
 
 import pytest
+from pydantic import ValidationError
 
 from chatlpt.config import Settings
 
@@ -41,3 +42,10 @@ def test_a_leftover_admin_emails_variable_is_named_in_a_warning(caplog: pytest.L
     caplog.clear()
     Settings.from_env({})
     assert not caplog.records
+
+
+def test_the_image_api_names_the_runner_s_profile() -> None:
+    assert Settings().image_api == "fal"  # D25's app, as before
+    assert Settings.from_env({"CHATLPT_IMAGE_API": "openai"}).image_api == "openai"
+    with pytest.raises(ValidationError, match="image_api"):
+        Settings.from_env({"CHATLPT_IMAGE_API": "other"})

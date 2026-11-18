@@ -187,8 +187,17 @@ class StaticImagePrices:
 
 
 class ScriptedImageResult:
-    def __init__(self, job_id: UUID, *, width: int = 1024, height: int = 768, flagged: bool = False) -> None:
-        self.url = f"https://images.test/{job_id}.jpg"
+    def __init__(
+        self,
+        job_id: UUID,
+        *,
+        width: int = 1024,
+        height: int = 768,
+        flagged: bool = False,
+        data: bytes | None = None,
+    ) -> None:
+        self.url = "" if data is not None else f"https://images.test/{job_id}.jpg"
+        self.data = data
         self.width = width
         self.height = height
         self.seed = 42
@@ -208,6 +217,7 @@ class ScriptedImageBackend:
         self.available: tuple[bool, str | None] = (True, None)
         self.size: tuple[int, int] = (1024, 768)
         self.flagged = False
+        self.inline: bytes | None = None  # set it to answer with the image itself, as openai.images.v1 does
 
     def ready(self) -> tuple[bool, str | None]:
         return self.available
@@ -219,7 +229,9 @@ class ScriptedImageBackend:
         if self.fail_with is not None:
             raise self.fail_with
         job_id = UUID(int=1000 + len(self.calls))
-        return ScriptedImageResult(job_id, width=self.size[0], height=self.size[1], flagged=self.flagged)
+        return ScriptedImageResult(
+            job_id, width=self.size[0], height=self.size[1], flagged=self.flagged, data=self.inline
+        )
 
 
 class MemoryImageFiles:

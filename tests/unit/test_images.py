@@ -207,3 +207,25 @@ async def test_open_image_is_owner_only_and_retention_expires_files(
         await app.images.open(user, image.id)
     detail = await store.list_messages(conversation.id)
     assert next(m for m in detail if m.kind == "tool_call").images[0].expired
+
+
+async def test_an_image_that_came_inside_the_answer_is_saved_without_a_fetch(
+    app_with_images: Application,
+    backend: ScriptedBackend,
+    image_backend: ScriptedImageBackend,
+    image_files: MemoryImageFiles,
+) -> None:
+    """The ``openai.images.v1`` profile returns the PNG in the answer: there is no URL to fetch."""
+    app = app_with_images
+    image_backend.inline = b"\x89PNG inline bytes"
+    user = await app.auth.signup(NewUser(email="inline@example.com", password="correct horse"))
+    conversation = await app.conversations.create(user)
+    backend.scripts = [
+        [ReplyChunk(kind="tool_call", tool_call=DRAW), ReplyChunk(kind="done", finish_reason="tool_calls")],
+        [ReplyChunk(kind="content", text="done"), ReplyChunk(kind="done", finish_reason="stop")],
+    ]
+    events = await collect(app.chat.start_reply(user, conversation.id, NewMessage(content="draw")))
+    image = next(e.image for e in events if e.type == "image")
+    assert image is not None and image.size_bytes == len(b"\x89PNG inline bytes")
+    assert image_files.fetched == []
+    assert list(image_files.files.values()) == [b"\x89PNG inline bytes"]

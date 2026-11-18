@@ -162,11 +162,12 @@ class Application:
         image_backend: ImageBackend | None = None
         if built is not None:
             from chatlpt.adapters.engine import BufferedEngineChat, StreamingEngineChat
-            from chatlpt.adapters.engine_images import EngineImages
+            from chatlpt.adapters.engine_images import EngineImages, EngineOpenAIImages
 
             engine, metadata = built
             if settings.tools_enabled:
-                image_backend = EngineImages(engine, app=settings.image_app)
+                images = EngineOpenAIImages if settings.image_api == "openai" else EngineImages
+                image_backend = images(engine, app=settings.image_app)
             adapter = StreamingEngineChat if engine.jobs.streaming is not None else BufferedEngineChat
             backend = adapter(
                 engine, clock, app=settings.chat_app, idle_timeout_s=settings.reply_idle_timeout_s

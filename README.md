@@ -189,7 +189,7 @@ Everything is an environment variable; `deploy/.env.example` lists each with its
 | `CHATLPT_GOOGLE_CLIENT_ID/SECRET`, `CHATLPT_GITHUB_CLIENT_ID/SECRET` | Enable each sign-in button |
 | `CHATLPT_SYSTEM_PROMPT`, `CHATLPT_TEMPERATURE`, `CHATLPT_MAX_OUTPUT_TOKENS` | Model defaults; the output limit covers answer plus thinking |
 | `CHATLPT_DEFAULT_THINKING`, `CHATLPT_THINKING_BUDGET_LOW/MEDIUM/HIGH` | The per-conversation thinking level and its chain-of-thought caps |
-| `CHATLPT_TOOLS_ENABLED`, `CHATLPT_IMAGE_APP`, `CHATLPT_IMAGES_DIR`, `CHATLPT_IMAGE_RETENTION_DAYS`, `CHATLPT_IMAGE_PRICING_FILE` | Model-driven images: the tool, the runner app, where files live, how long, and fal's price table |
+| `CHATLPT_TOOLS_ENABLED`, `CHATLPT_IMAGE_APP`, `CHATLPT_IMAGE_API`, `CHATLPT_IMAGES_DIR`, `CHATLPT_IMAGE_RETENTION_DAYS`, `CHATLPT_IMAGE_PRICING_FILE` | Model-driven images: the tool, the runner app, the format it speaks (`fal`, or `openai` for the `openai.images.v1` profile, D30), where files live, how long, and the vendor's price table |
 | `CHATLPT_CONTEXT_WINDOW_OVERRIDE` | Last-resort override of the derived context window |
 | `CHATLPT_PRICING_FILE` | The retail price table (`config/pricing/qwen3.8-27b.json`) |
 | `LPB_*` | The embedded engine: signer, Batteries, shared key, database. See [payment-stack](docs/references/payment-stack.md) |

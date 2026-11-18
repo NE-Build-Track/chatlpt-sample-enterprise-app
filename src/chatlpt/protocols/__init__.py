@@ -181,7 +181,10 @@ class ImageResult(Protocol):
     """What one image job produced."""
 
     @property
-    def url(self) -> str: ...
+    def url(self) -> str: ...  # where the app keeps the image for a while; empty when ``data`` holds it
+
+    @property
+    def data(self) -> bytes | None: ...  # the image itself, when the app returned it in its answer (D30)
 
     @property
     def width(self) -> int: ...
@@ -218,7 +221,8 @@ class ImageBackend(Protocol):
 
 
 class ImageFiles(Protocol):
-    """Where generated images live: fetched from the runner's temporary URL, kept on our volume."""
+    """Where generated images live: fetched from the runner's temporary URL, or taken from its answer, and
+    kept on our volume."""
 
     async def fetch(self, url: str) -> bytes: ...
 

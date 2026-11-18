@@ -19,3 +19,9 @@ so does the engine's reader.
 (20 runners, no `comfystream/fal-flux-schnell`). `hky` serves `blueclaw/chat/qwen3.8-27b` without
 `observed_at`, so its runner is skipped; `speedybird` and `open-pool` failed TLS; `orch-us-central`
 timed out. No approved host then offered the chat app to builder-core `v0.2.0`.
+
+**2026-11-18**, the same dump from node `eee09c4` (v1.0.7): again only `ai1` answered, with 20 runners.
+It offers `text-to-image` (FLUX.2 [klein] 4B, profile `openai.images.v1`), which the app can use with
+`CHATLPT_IMAGE_API=openai` (D30), and no chat app. The chat model was on the network as app `chat` on
+`https://livepeer-ai.xodeapp.xyz:38935`, which is not on the approved list; a paid reply through it
+worked in a test run with that host added and `CHATLPT_CHAT_APP=chat` set for the run only.
